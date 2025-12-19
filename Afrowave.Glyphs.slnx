@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Core/Core.csproj" />
+  <Project Path="Editor.Avalonia/Editor.Avalonia.csproj" />
+  <Project Path="Editor.Consolonia/Editor.Consolonia.csproj" />
+  <Project Path="Storage.Abstractions/Storage.Abstractions.csproj" />
+  <Project Path="Storage.FileSystem/Storage.FileSystem.csproj" />
+</Solution>
