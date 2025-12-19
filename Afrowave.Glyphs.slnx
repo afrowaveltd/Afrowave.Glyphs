@@ -2,6 +2,7 @@
   <Project Path="Core/Core.csproj" />
   <Project Path="Editor.Avalonia/Editor.Avalonia.csproj" />
   <Project Path="Editor.Consolonia/Editor.Consolonia.csproj" />
+  <Project Path="Runtime/Runtime.csproj" Id="37d8e469-c833-4721-b005-45d249f724ad" />
   <Project Path="Storage.Abstractions/Storage.Abstractions.csproj" />
   <Project Path="Storage.FileSystem/Storage.FileSystem.csproj" />
 </Solution>
