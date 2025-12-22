@@ -18,10 +18,14 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="System.Reactive" Version="7.0.0-preview.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\App\Tools.csproj" />
     <ProjectReference Include="..\Core\Core.csproj" />
+    <ProjectReference Include="..\Runtime\Runtime.csproj" />
+    <ProjectReference Include="..\Storage.Abstractions\Storage.Abstractions.csproj" />
     <ProjectReference Include="..\Storage.FileSystem\Storage.FileSystem.csproj" />
   </ItemGroup>
 </Project>

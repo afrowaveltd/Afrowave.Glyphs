@@ -27,7 +27,11 @@ namespace Storage.FileSystem
       }
 
       public string GetStyleFolder(string packId, FontStyleId style)
-          => Path.Combine(GetPackFolderFromPackId(packId), style.Name);
+      {
+         var name = style.Name;
+         if(string.IsNullOrEmpty(name)) throw new ArgumentException($"Style name is null or empty. PackId: {packId}", nameof(style));
+         return Path.Combine(GetPackFolderFromPackId(packId), name);
+      }
 
       private string GetPackFolderFromPackId(string packId)
       {

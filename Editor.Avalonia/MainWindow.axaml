@@ -1,9 +1,59 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:local="using:Editor.Avalonia"
+        xmlns:tools="clr-namespace:Tools;assembly=Tools"
+        xmlns:models="clr-namespace:Storage.Abstractions.Models;assembly=Storage.Abstractions"
         x:Class="Editor.Avalonia.MainWindow"
-        Title="Editor.Avalonia">
-    Welcome to Avalonia!
+        Width="1200" Height="700"
+        Title="Afrowave Glyph Editor"
+        x:DataType="tools:MainViewModel">
+
+  <Grid RowDefinitions="Auto,*" ColumnDefinitions="2*,3*">
+
+    <!-- Top bar -->
+    <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="10">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="10">
+        <TextBlock VerticalAlignment="Center" Text="Text:"/>
+        <TextBox Grid.Column="1" Text="{Binding Text}" Watermark="Type preview text..." />
+
+        <ComboBox Grid.Column="2"
+                  Width="140"
+                  ItemsSource="{Binding PackIds}"
+                  SelectedItem="{Binding SelectedPackId}" />
+
+        <ComboBox Grid.Column="3"
+                  Width="160"
+                  ItemsSource="{Binding Styles}"
+                  SelectedItem="{Binding SelectedStyle}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="models:FontStyleId">
+              <TextBlock Text="{Binding Name}"/>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <Button Grid.Column="4" Content="Reload" Command="{Binding ReloadCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Left placeholder -->
+    <Border Grid.Row="1" Grid.Column="0" Padding="10">
+       <StackPanel Spacing="6">
+    <TextBlock Text="Selected glyph:" FontWeight="Bold"/>
+    <TextBlock Text="{Binding SelectedGlyphText}" />
+  </StackPanel>
+    </Border>
+
+    <!-- Right terminal -->
+    <Border Grid.Row="1" Grid.Column="1" Padding="10">
+      <local:TerminalPreviewControl x:Name="Terminal"
+                                      Buffer="{Binding PreviewBuffer}"
+                                      PackId="{Binding SelectedPackId}"
+                                      Style="{Binding SelectedStyle}"
+                                      GlyphSize="{Binding GlyphSize}"
+                                      FallbackGlyph="{Binding FallbackGlyph}"
+                                      SelectedGlyph="{Binding SelectedGlyph, Mode=TwoWay}" />
+    </Border>
+
+  </Grid>
 </Window>
