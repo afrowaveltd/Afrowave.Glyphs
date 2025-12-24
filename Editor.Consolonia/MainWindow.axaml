@@ -7,11 +7,9 @@
         x:Class="Editor.Consolonia.MainWindow"
         RequestedThemeVariant="Dark"
         Title="Consolonia">
-    <StackPanel
-        VerticalAlignment="Center"
-        HorizontalAlignment="Center">
-        <TextBlock Text="Welcome to Consolonia!" />
-        <Button Content="_Exit"
-                Click="OnExit" />
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="1">
+        <TextBlock Text="Afrowave Glyph Editor (Consolonia)" />
+        <Button Content="_Import Font…" Command="{Binding StartImportCommand}" />
+        <Button Content="_Exit" Click="OnExit" />
     </StackPanel>
 </Window>

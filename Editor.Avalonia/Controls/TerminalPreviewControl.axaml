@@ -5,7 +5,9 @@
                        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
                        x:Class="Editor.Avalonia.TerminalPreviewControl"
                        Background="Transparent">
-             <Border Padding="8">
-    <Canvas x:Name="PART_Canvas"/>
-  </Border>
+   <ScrollViewer Padding="8"
+                 HorizontalScrollBarVisibility="Auto"
+                 VerticalScrollBarVisibility="Auto">
+     <Canvas x:Name="PART_Canvas"/>
+   </ScrollViewer>
 </UserControl>

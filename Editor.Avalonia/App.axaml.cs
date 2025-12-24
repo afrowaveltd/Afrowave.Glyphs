@@ -60,8 +60,11 @@ public partial class App : Application
          var settingsService = new SettingsService(store);
          await settingsService.InitializeAsync().ConfigureAwait(true);
 
+          var workspaceService = new EditorWorkspaceService(settingsService);
+
          var settings = settingsService.Current;
-         string symbolsRoot = settings.GetActiveSymbolsRoot();
+          string workspaceRoot = settings.GetActiveSymbolsRoot();
+          string symbolsRoot = SymbolsFolderResolver.ResolveSymbolsRoot(workspaceRoot, createIfMissing: true);
 
          // 2) Create FS storage services (repo + pack provider)
          IGlyphRepository repo = CreateRepository(symbolsRoot);
@@ -85,6 +88,7 @@ public partial class App : Application
          var window = new MainWindow();
          window.DataContext = vm;
          window.SetTerminalCache(cache);
+          window.SetWorkspace(workspaceService);
 
          desktop.MainWindow = window;
          window.Show();

@@ -31,7 +31,18 @@ namespace Storage.FileSystem
       public async Task<Glyph> LoadAsync(string packId, FontStyleId style, GlyphId id, CancellationToken cancellationToken)
       {
          var path = _paths.GetGlyphFilePath(packId, style, id);
-         return await GlyphFileCodecV1.LoadAsync(path, id, cancellationToken).ConfigureAwait(false);
+
+         // Preferred format: plain hex string in the glyph file.
+         // Backward compatibility: if the file is legacy binary (AFWG), fall back to GlyphFileCodecV1.
+         try
+         {
+            var size = ParsePackId(packId);
+            return await GlyphHexCodecV1.LoadAsync(path, id, size, cancellationToken).ConfigureAwait(false);
+         }
+         catch
+         {
+            return await GlyphFileCodecV1.LoadAsync(path, id, cancellationToken).ConfigureAwait(false);
+         }
       }
 
       public async Task SaveAsync(string packId, FontStyleId style, Glyph glyph, CancellationToken cancellationToken)
@@ -67,6 +78,17 @@ namespace Storage.FileSystem
          }
 
          return Task.FromResult((IReadOnlyList<GlyphInfo>)list);
+      }
+
+      private static GridSize ParsePackId(string packId)
+      {
+         // Expected format "WxH" e.g. "8x16".
+         packId = (packId ?? string.Empty).Trim();
+         var parts = packId.Split('x', 'X');
+         if(parts.Length == 2 && int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var h))
+            return new GridSize(w, h);
+
+         return new GridSize(8, 16);
       }
    }
 }

@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Editor.Consolonia"
+        x:Class="Editor.Consolonia.FilePickerWindow"
+        Width="100" Height="30"
+        Title="Select file"
+        x:DataType="local:FilePickerViewModel">
+
+  <StackPanel Spacing="1">
+    <TextBlock Text="Directory:" />
+    <TextBlock Text="{Binding CurrentDirectory}" />
+
+    <TextBlock Text="Filter:" />
+    <TextBox Text="{Binding FilterText}" Watermark=".ttf;.otf" />
+
+    <TextBlock Text="Items:" />
+    <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Height="12" />
+
+    <StackPanel Orientation="Horizontal" Spacing="1">
+      <Button Content="Open" Click="OnOpen" />
+      <Button Content="Select" Click="OnSelect" />
+      <Button Content="Cancel" Click="OnCancel" />
+    </StackPanel>
+  </StackPanel>
+</Window>

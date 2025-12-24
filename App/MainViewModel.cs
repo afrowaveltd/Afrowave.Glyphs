@@ -19,10 +19,24 @@ namespace Tools
       private readonly GlyphResolver _resolver;
       private readonly TextToTerminalRenderer _renderer;
 
+      public IGlyphRepository Repository => _repo;
+
       public event PropertyChangedEventHandler? PropertyChanged;
 
       public ObservableCollection<string> PackIds { get; } = new ObservableCollection<string>();
       public ObservableCollection<FontStyleId> Styles { get; } = new ObservableCollection<FontStyleId>();
+
+      public ObservableCollection<GridSize> GlyphSizePresets { get; } = new ObservableCollection<GridSize>
+      {
+         // Common character displays (HD44780 and similar)
+         new GridSize(5, 8),
+         new GridSize(5, 10),
+
+         // Editor / terminal-friendly sizes
+         new GridSize(8, 16),
+         new GridSize(16, 16),
+         new GridSize(32, 32)
+      };
 
       private string _selectedPackId = "8x16";
       public string SelectedPackId
@@ -31,7 +45,10 @@ namespace Tools
          set
          {
             if(Set(ref _selectedPackId, value))
+            {
+               UpdateSelectedGlyphSizeFromPackId(value);
                _ = ReloadStylesAndRenderAsync();
+            }
          }
       }
 
@@ -46,7 +63,7 @@ namespace Tools
          }
       }
 
-      private GlyphId _selectedGlyph;
+      private GlyphId _selectedGlyph = GlyphId.FromInternal("missing");
       public GlyphId SelectedGlyph
       {
          get => _selectedGlyph;
@@ -80,7 +97,51 @@ namespace Tools
          private set => Set(ref _previewBuffer, value);
       }
 
-      public GridSize GlyphSize { get; } = new GridSize(8, 16);
+      private GridSize _selectedGlyphSize = new GridSize(8, 16);
+      public GridSize SelectedGlyphSize
+      {
+         get => _selectedGlyphSize;
+         set
+         {
+            if(Set(ref _selectedGlyphSize, value))
+            {
+               // keep pack id in sync with sizes like "8x16" when user picks a preset/custom size
+               var asPackId = value.ToString();
+               if(!string.Equals(SelectedPackId, asPackId, StringComparison.OrdinalIgnoreCase))
+                  _selectedPackId = asPackId;
+
+               // if a glyph is currently edited, reset to new size
+               EditedBitmap = null;
+               IsGlyphDirty = false;
+               _ = RenderAsync();
+            }
+         }
+      }
+
+      // Backward-compat binding used by existing controls.
+      public GridSize GlyphSize => SelectedGlyphSize;
+
+      private int _customGlyphWidth = 8;
+      public int CustomGlyphWidth
+      {
+         get => _customGlyphWidth;
+         set
+         {
+            if(Set(ref _customGlyphWidth, value))
+               TryApplyCustomGlyphSize();
+         }
+      }
+
+      private int _customGlyphHeight = 16;
+      public int CustomGlyphHeight
+      {
+         get => _customGlyphHeight;
+         set
+         {
+            if(Set(ref _customGlyphHeight, value))
+               TryApplyCustomGlyphSize();
+         }
+      }
       public GlyphId FallbackGlyph { get; } = GlyphId.FromInternal("MISSING");
 
       public TextLayoutOptions LayoutOptions { get; } = new TextLayoutOptions
@@ -92,6 +153,36 @@ namespace Tools
 
       public AsyncCommand ReloadCommand { get; }
       public AsyncCommand RenderCommand { get; }
+      public AsyncCommand OpenWorkspaceCommand { get; }
+      public AsyncCommand CreateSymbolsCommand { get; }
+      public AsyncCommand ImportFontCommand { get; }
+      public AsyncCommand SaveGlyphCommand { get; }
+      public AsyncCommand ClearGlyphCommand { get; }
+      public AsyncCommand RevertGlyphCommand { get; }
+
+      public Func<Task>? OpenWorkspaceHandler { get; set; }
+      public Func<Task>? CreateSymbolsHandler { get; set; }
+      public Func<Task>? ImportFontHandler { get; set; }
+      public Func<Task>? GlyphSavedHandler { get; set; }
+      public Func<GlyphId, GlyphBitmap, Task>? GlyphBitmapReplacedHandler { get; set; }
+
+      private GlyphBitmap? _editedBitmap;
+      public GlyphBitmap? EditedBitmap
+      {
+         get => _editedBitmap;
+         set
+         {
+            if(Set(ref _editedBitmap, value))
+               IsGlyphDirty = value != null;
+         }
+      }
+
+      private bool _isGlyphDirty;
+      public bool IsGlyphDirty
+      {
+         get => _isGlyphDirty;
+         private set => Set(ref _isGlyphDirty, value);
+      }
 
       public MainViewModel(IFontPackProvider packs, IGlyphRepository repo)
       {
@@ -101,8 +192,109 @@ namespace Tools
          _resolver = new GlyphResolver(_repo);
          _renderer = new TextToTerminalRenderer(_resolver);
 
+         UpdateSelectedGlyphSizeFromPackId(_selectedPackId);
+         _customGlyphWidth = SelectedGlyphSize.Width;
+         _customGlyphHeight = SelectedGlyphSize.Height;
+
          ReloadCommand = new AsyncCommand(ReloadAsync);
          RenderCommand = new AsyncCommand(RenderAsync);
+
+         OpenWorkspaceCommand = new AsyncCommand(() => OpenWorkspaceHandler?.Invoke() ?? Task.CompletedTask);
+         CreateSymbolsCommand = new AsyncCommand(() => CreateSymbolsHandler?.Invoke() ?? Task.CompletedTask);
+         ImportFontCommand = new AsyncCommand(() => ImportFontHandler?.Invoke() ?? Task.CompletedTask);
+         SaveGlyphCommand = new AsyncCommand(SaveSelectedGlyphAsync);
+         ClearGlyphCommand = new AsyncCommand(ClearSelectedGlyphAsync);
+         RevertGlyphCommand = new AsyncCommand(RevertSelectedGlyphAsync);
+      }
+
+      private void UpdateSelectedGlyphSizeFromPackId(string? packId)
+      {
+         if(string.IsNullOrWhiteSpace(packId))
+            return;
+
+         var parsed = TryParseGridSize(packId, out var size) ? size : SelectedGlyphSize;
+         if(!parsed.Equals(SelectedGlyphSize))
+         {
+            _selectedGlyphSize = parsed;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedGlyphSize)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GlyphSize)));
+
+            _customGlyphWidth = parsed.Width;
+            _customGlyphHeight = parsed.Height;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CustomGlyphWidth)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CustomGlyphHeight)));
+         }
+      }
+
+      private void TryApplyCustomGlyphSize()
+      {
+         if(CustomGlyphWidth <= 0 || CustomGlyphHeight <= 0)
+            return;
+
+         var next = new GridSize(CustomGlyphWidth, CustomGlyphHeight);
+         if(next.Equals(SelectedGlyphSize))
+            return;
+
+         SelectedGlyphSize = next;
+      }
+
+      private static bool TryParseGridSize(string text, out GridSize size)
+      {
+         size = default;
+         if(string.IsNullOrWhiteSpace(text)) return false;
+
+         var parts = text.Trim().Split('x', 'X');
+         if(parts.Length != 2) return false;
+
+         if(!int.TryParse(parts[0], out var w)) return false;
+         if(!int.TryParse(parts[1], out var h)) return false;
+         if(w <= 0 || h <= 0) return false;
+
+         size = new GridSize(w, h);
+         return true;
+      }
+
+      public async Task SaveSelectedGlyphAsync()
+      {
+         if(EditedBitmap == null)
+            return;
+
+         var glyph = new Glyph(SelectedGlyph, GlyphSize, EditedBitmap.Clone());
+         await _repo.SaveAsync(SelectedPackId, SelectedStyle, glyph, CancellationToken.None).ConfigureAwait(false);
+
+         IsGlyphDirty = false;
+
+         if(GlyphSavedHandler != null)
+            await GlyphSavedHandler().ConfigureAwait(false);
+      }
+
+      public async Task ClearSelectedGlyphAsync()
+      {
+         var empty = new GlyphBitmap(GlyphSize, new byte[GlyphBitmap.GetByteLength(GlyphSize)]);
+         EditedBitmap = empty;
+
+         if(GlyphBitmapReplacedHandler != null)
+            await GlyphBitmapReplacedHandler(SelectedGlyph, empty).ConfigureAwait(false);
+      }
+
+      public async Task RevertSelectedGlyphAsync()
+      {
+         GlyphBitmap bmp;
+         if(await _repo.ExistsAsync(SelectedPackId, SelectedStyle, SelectedGlyph, CancellationToken.None).ConfigureAwait(false))
+         {
+            var glyph = await _repo.LoadAsync(SelectedPackId, SelectedStyle, SelectedGlyph, CancellationToken.None).ConfigureAwait(false);
+            bmp = glyph.Bitmap.Clone();
+         }
+         else
+         {
+            bmp = new GlyphBitmap(GlyphSize, new byte[GlyphBitmap.GetByteLength(GlyphSize)]);
+         }
+
+         EditedBitmap = bmp;
+         IsGlyphDirty = false;
+
+         if(GlyphBitmapReplacedHandler != null)
+            await GlyphBitmapReplacedHandler(SelectedGlyph, bmp).ConfigureAwait(false);
       }
 
       public async Task ReloadAsync()
@@ -156,9 +348,22 @@ namespace Tools
 
       public async Task RenderAsync()
       {
-         // MVP: fixed terminal size
-         const int w = 40;
-         const int h = 12;
+         // Scale terminal preview size based on glyph pixel size.
+         // Smaller glyphs -> more cells, bigger glyphs -> fewer cells.
+         int w = 40;
+         int h = 12;
+
+         var gs = SelectedGlyphSize;
+         if(gs.Width <= 6 && gs.Height <= 10)
+         {
+            w = 60;
+            h = 18;
+         }
+         else if(gs.Width >= 24 || gs.Height >= 24)
+         {
+            w = 24;
+            h = 10;
+         }
 
          var buffer = await _renderer.RenderAsync(
              SelectedPackId,

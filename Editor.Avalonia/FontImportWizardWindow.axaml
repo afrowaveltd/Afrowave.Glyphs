@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:tools="clr-namespace:Tools.FontImport;assembly=Tools"
+        x:Class="Editor.Avalonia.FontImportWizardWindow"
+        Width="720" Height="520"
+        Title="Import font glyphs"
+        x:DataType="tools:FontImportWizardViewModel">
+
+  <Border Padding="12">
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*" RowSpacing="10">
+
+    <Border Grid.Row="0" Padding="8" BorderBrush="#333" BorderThickness="1">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Font:"/>
+        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding FontPath}" Watermark="Select .ttf/.otf"/>
+        <Button Grid.Row="0" Grid.Column="2" Content="Browse…" Command="{Binding PickFontCommand}"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Pack:"/>
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PackId}"/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Size:"/>
+        <ComboBox Grid.Row="2" Grid.Column="1" Width="140" ItemsSource="{Binding Presets}" SelectedItem="{Binding GlyphSize}"/>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Padding="10" BorderBrush="#333" BorderThickness="1">
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="8">
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" FontWeight="Bold" Text="Range"/>
+
+        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
+          <TextBlock VerticalAlignment="Center" Text="Start:"/>
+          <TextBox Width="90" Text="{Binding RangeStart}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+          <TextBlock VerticalAlignment="Center" Text="End:"/>
+          <TextBox Width="90" Text="{Binding RangeEnd}"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" FontWeight="Bold" Text="Current"/>
+
+        <StackPanel Grid.Row="3" Grid.Column="0" Spacing="6">
+          <TextBlock Text="{Binding CurrentGlyphIdText}"/>
+          <TextBlock Opacity="0.8" Text="{Binding ProgressText}"/>
+          <TextBlock FontSize="26" Text="{Binding CurrentChar}"/>
+          <TextBlock Opacity="0.8" Text="Edit glyph in the main editor and press Next to save."/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Grid.Column="1" Spacing="6">
+          <TextBlock Text="Status:" FontWeight="Bold"/>
+          <TextBlock Text="{Binding Status}"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Start" Command="{Binding StartCommand}"/>
+      <Button Content="Previous" Command="{Binding PreviousCommand}"/>
+      <Button Content="Skip" Command="{Binding SkipCommand}"/>
+      <Button Content="Next (Save)" Command="{Binding NextCommand}"/>
+      <Button Content="Cancel" Command="{Binding CancelCommand}"/>
+      <Button Content="Close" Command="{Binding FinishCommand}"/>
+    </StackPanel>
+
+    </Grid>
+  </Border>
+</Window>

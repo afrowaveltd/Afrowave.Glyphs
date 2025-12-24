@@ -2,26 +2,44 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:Editor.Avalonia"
         xmlns:tools="clr-namespace:Tools;assembly=Tools"
+        xmlns:controls="clr-namespace:Editor.Avalonia.Controls"
         xmlns:models="clr-namespace:Storage.Abstractions.Models;assembly=Storage.Abstractions"
         x:Class="Editor.Avalonia.MainWindow"
         Width="1200" Height="700"
         Title="Afrowave Glyph Editor"
         x:DataType="tools:MainViewModel">
 
-  <Grid RowDefinitions="Auto,*" ColumnDefinitions="2*,3*">
+  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,*">
 
     <!-- Top bar -->
-    <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="10">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="10">
-        <TextBlock VerticalAlignment="Center" Text="Text:"/>
-        <TextBox Grid.Column="1" Text="{Binding Text}" Watermark="Type preview text..." />
+      <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="10">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+        <Button Content="Open workspace…" Command="{Binding OpenWorkspaceCommand}" />
+        <Button Grid.Column="1" Content="Create Symbols" Command="{Binding CreateSymbolsCommand}" />
+         <Button Grid.Column="2" Content="Import font…" Command="{Binding ImportFontCommand}" />
 
-        <ComboBox Grid.Column="2"
+        <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="Glyph:"/>
+        <ComboBox Grid.Column="4"
+                  Width="110"
+                  ItemsSource="{Binding GlyphSizePresets}"
+                  SelectedItem="{Binding SelectedGlyphSize}" />
+
+        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="W:" VerticalAlignment="Center"/>
+          <TextBox Width="44" Text="{Binding CustomGlyphWidth}" />
+          <TextBlock Text="H:" VerticalAlignment="Center"/>
+          <TextBox Width="44" Text="{Binding CustomGlyphHeight}" />
+        </StackPanel>
+
+        <TextBlock Grid.Column="6" VerticalAlignment="Center" Text="Text:"/>
+        <TextBox Grid.Column="7" Text="{Binding Text}" Watermark="Type preview text..." />
+
+        <ComboBox Grid.Column="8"
                   Width="140"
                   ItemsSource="{Binding PackIds}"
                   SelectedItem="{Binding SelectedPackId}" />
 
-        <ComboBox Grid.Column="3"
+        <ComboBox Grid.Column="9"
                   Width="160"
                   ItemsSource="{Binding Styles}"
                   SelectedItem="{Binding SelectedStyle}">
@@ -32,28 +50,46 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
 
-        <Button Grid.Column="4" Content="Reload" Command="{Binding ReloadCommand}" />
+        <Button Grid.Column="10" Content="Reload" Command="{Binding ReloadCommand}" />
       </Grid>
     </Border>
 
     <!-- Left placeholder -->
-    <Border Grid.Row="1" Grid.Column="0" Padding="10">
+    <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto,*">
+      <Border Grid.Row="0" Grid.Column="0" Padding="10">
        <StackPanel Spacing="6">
-    <TextBlock Text="Selected glyph:" FontWeight="Bold"/>
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <TextBlock Text="Selected glyph:" FontWeight="Bold"/>
+      <TextBlock Text="*" IsVisible="{Binding IsGlyphDirty}" />
+    </StackPanel>
     <TextBlock Text="{Binding SelectedGlyphText}" />
-  </StackPanel>
-    </Border>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Save" Command="{Binding SaveGlyphCommand}" Width="90" IsEnabled="{Binding IsGlyphDirty}" />
+      <Button Content="Revert" Command="{Binding RevertGlyphCommand}" Width="90" />
+      <Button Content="Clear" Command="{Binding ClearGlyphCommand}" Width="90" />
+    </StackPanel>
+           <controls:GlyphPreviewControl x:Name="GlyphPreview"
+                              PackId="{Binding SelectedPackId}"
+                              Style="{Binding SelectedStyle}"
+                              GlyphId="{Binding SelectedGlyph}"
+                              GlyphSize="{Binding GlyphSize}"
+                              PixelScale="16"/>
+         </StackPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="6" Background="#2A2A2A" ResizeDirection="Columns" />
 
     <!-- Right terminal -->
-    <Border Grid.Row="1" Grid.Column="1" Padding="10">
-      <local:TerminalPreviewControl x:Name="Terminal"
+      <Border Grid.Row="0" Grid.Column="2" Padding="10">
+        <local:TerminalPreviewControl x:Name="Terminal"
                                       Buffer="{Binding PreviewBuffer}"
                                       PackId="{Binding SelectedPackId}"
                                       Style="{Binding SelectedStyle}"
                                       GlyphSize="{Binding GlyphSize}"
                                       FallbackGlyph="{Binding FallbackGlyph}"
                                       SelectedGlyph="{Binding SelectedGlyph, Mode=TwoWay}" />
-    </Border>
+      </Border>
+    </Grid>
 
   </Grid>
 </Window>

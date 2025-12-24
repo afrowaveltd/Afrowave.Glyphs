@@ -45,35 +45,40 @@ public partial class TerminalPreviewControl : UserControl
 
    private readonly Canvas _canvas;
    private TerminalGlyphCache? _cache;
-   public event Action<GlyphId>? GlyphClicked;
 
+   public event Action<GlyphId>? GlyphClicked;
+   public event Action<int, int>? CellClicked;
+
+   private int _selectedCellX = -1;
+   private int _selectedCellY = -1;
 
    public TerminalPreviewControl()
    {
       InitializeComponent();
-      _canvas = this.FindControl<Canvas>("PART_Canvas")!; // Přidáno ! pro potlašení CS8601
-      this.AddHandler(
-    PointerPressedEvent,
-    (sender, e) => OnPointerPressed(sender, (PointerPressedEventArgs)e),
-    RoutingStrategies.Bubble
-);
 
+      _canvas = this.FindControl<Canvas>("PART_Canvas")!;
 
+      // PointerPressed on the control (bubble)
+      AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Bubble);
 
-
-
+      // Redraw on property changes
       this.GetObservable(BufferProperty).Subscribe(_ => RequestRedraw());
       this.GetObservable(GlyphSizeProperty).Subscribe(_ => RequestRedraw());
       this.GetObservable(PixelScaleProperty).Subscribe(_ => RequestRedraw());
       this.GetObservable(ShowGridProperty).Subscribe(_ => RequestRedraw());
       this.GetObservable(HighlightFallbackProperty).Subscribe(_ => RequestRedraw());
-
+      this.GetObservable(PackIdProperty).Subscribe(_ => RequestRedraw());
+      this.GetObservable(StyleProperty).Subscribe(_ => RequestRedraw());
    }
 
-   private void RequestRedraw()
+   public void ClearSelection()
    {
-      _ = RedrawAsync();
+      _selectedCellX = -1;
+      _selectedCellY = -1;
+      RequestRedraw();
    }
+
+   private void RequestRedraw() => _ = RedrawAsync();
 
    public TerminalBuffer Buffer
    {
@@ -117,43 +122,6 @@ public partial class TerminalPreviewControl : UserControl
       set => SetValue(StyleProperty, value);
    }
 
-   private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
-   {
-      if(_cache == null || Buffer == null)
-         return;
-
-      var point = e.GetPosition(_canvas);
-
-      int cellWidth = GlyphSize.Width * PixelScale;
-      int cellHeight = GlyphSize.Height * PixelScale;
-
-      int cellX = (int)(point.X / cellWidth);
-      int cellY = (int)(point.Y / cellHeight);
-
-      if(cellX < 0 || cellY < 0)
-         return;
-
-      if(cellX >= Buffer.Width || cellY >= Buffer.Height)
-         return;
-
-      var cell = Buffer.GetCell(cellX, cellY);
-      if(cell == null) return;
-
-      var glyphId = cell.Requested;
-      SelectedGlyph = glyphId;
-      GlyphClicked?.Invoke(glyphId);
-
-      if(cell.IsFallback)
-      {
-         // třeba zvýraznit červeně
-      }
-
-      CellClicked?.Invoke(cellX, cellY);
-
-   }
-   public event Action<int, int>? CellClicked;
-
-
    public GlyphId FallbackGlyph
    {
       get => GetValue(FallbackGlyphProperty);
@@ -170,7 +138,47 @@ public partial class TerminalPreviewControl : UserControl
    public void SetCache(TerminalGlyphCache cache)
    {
       _cache = cache;
-      _ = RedrawAsync();
+      RequestRedraw();
+   }
+
+   private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+   {
+      if(_cache == null)
+         return;
+
+      var buffer = Buffer;
+      if(buffer == null)
+         return;
+
+      var point = e.GetPosition(_canvas);
+
+      int cellWidth = GlyphSize.Width * (PixelScale <= 0 ? 1 : PixelScale);
+      int cellHeight = GlyphSize.Height * (PixelScale <= 0 ? 1 : PixelScale);
+
+      int cellX = (int)(point.X / cellWidth);
+      int cellY = (int)(point.Y / cellHeight);
+
+      if(cellX < 0 || cellY < 0)
+         return;
+
+      if(cellX >= buffer.Width || cellY >= buffer.Height)
+         return;
+
+      var cell = buffer.GetCell(cellX, cellY);
+      if(cell == null)
+         return;
+
+      // selection highlight
+      _selectedCellX = cellX;
+      _selectedCellY = cellY;
+
+      // propagate selection
+      var glyphId = cell.Requested;
+      SelectedGlyph = glyphId;
+      GlyphClicked?.Invoke(glyphId);
+      CellClicked?.Invoke(cellX, cellY);
+
+      RequestRedraw();
    }
 
    private async Task RedrawAsync()
@@ -203,7 +211,8 @@ public partial class TerminalPreviewControl : UserControl
                EndPoint = new Point(cx * cellPixelW, buffer.Height * cellPixelH),
                Stroke = Brushes.Gray,
                StrokeThickness = 1,
-               Opacity = 0.2
+               Opacity = 0.2,
+               IsHitTestVisible = false
             };
             _canvas.Children.Add(line);
          }
@@ -216,7 +225,8 @@ public partial class TerminalPreviewControl : UserControl
                EndPoint = new Point(buffer.Width * cellPixelW, cy * cellPixelH),
                Stroke = Brushes.Gray,
                StrokeThickness = 1,
-               Opacity = 0.2
+               Opacity = 0.2,
+               IsHitTestVisible = false
             };
             _canvas.Children.Add(line);
          }
@@ -230,24 +240,48 @@ public partial class TerminalPreviewControl : UserControl
             var cell = buffer.GetCell(x, y);
             if(cell == null) continue;
 
-            var bmp = await _cache.GetBitmapAsync(PackId, Style, cell.Resolved, gsize, FallbackGlyph, CancellationToken.None)
-                .ConfigureAwait(true); // UI thread ok for MVP
+            var bmp = await _cache
+               .GetBitmapAsync(PackId, Style, cell.Resolved, gsize, FallbackGlyph, CancellationToken.None)
+               .ConfigureAwait(true); // UI thread ok for MVP
 
             DrawGlyphBitmap(x, y, bmp, scale, cellPixelW, cellPixelH);
 
+            // fallback hint
             if(HighlightFallback && cell.IsFallback)
             {
-               var border = new global::Avalonia.Controls.Border
+               var fb = new global::Avalonia.Controls.Shapes.Rectangle
                {
                   Width = cellPixelW,
                   Height = cellPixelH,
-                  BorderBrush = Brushes.Orange,
-                  BorderThickness = new Thickness(1),
-                  Opacity = 0.6
+                  Stroke = Brushes.Orange,
+                  StrokeThickness = 1,
+                  Opacity = 0.6,
+                  Fill = null,
+                  IsHitTestVisible = false
                };
-               Canvas.SetLeft(border, x * cellPixelW);
-               Canvas.SetTop(border, y * cellPixelH);
-               _canvas.Children.Add(border);
+
+               Canvas.SetLeft(fb, x * cellPixelW);
+               Canvas.SetTop(fb, y * cellPixelH);
+               _canvas.Children.Add(fb);
+            }
+
+            // selection highlight (draw last so it stays on top)
+            if(x == _selectedCellX && y == _selectedCellY)
+            {
+               var sel = new global::Avalonia.Controls.Shapes.Rectangle
+               {
+                  Width = cellPixelW,
+                  Height = cellPixelH,
+                  Stroke = Brushes.Orange,
+                  StrokeThickness = 2,
+                  Opacity = 1.0,
+                  Fill = null,
+                  IsHitTestVisible = false
+               };
+
+               Canvas.SetLeft(sel, x * cellPixelW);
+               Canvas.SetTop(sel, y * cellPixelH);
+               _canvas.Children.Add(sel);
             }
          }
       }
@@ -255,7 +289,6 @@ public partial class TerminalPreviewControl : UserControl
 
    private void DrawGlyphBitmap(int cellX, int cellY, GlyphBitmap bitmap, int scale, int cellPixelW, int cellPixelH)
    {
-      // Draw ON pixels as rectangles
       int offsetX = cellX * cellPixelW;
       int offsetY = cellY * cellPixelH;
 
@@ -270,7 +303,8 @@ public partial class TerminalPreviewControl : UserControl
             {
                Width = scale,
                Height = scale,
-               Fill = Brushes.White
+               Fill = Brushes.White,
+               IsHitTestVisible = false
             };
 
             Canvas.SetLeft(rect, offsetX + px * scale);

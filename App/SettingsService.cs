@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Storage.FileSystem;
 
 namespace Tools
 {
@@ -19,7 +20,7 @@ namespace Tools
       public async Task InitializeAsync()
       {
          Current = await _store.LoadAsync().ConfigureAwait(false);
-         EnsureSymbolsRootExists(Current.GetActiveSymbolsRoot());
+         EnsureWorkspaceRootExists(Current.GetActiveSymbolsRoot());
       }
 
       public async Task AddSymbolsRootAsync(string path)
@@ -27,7 +28,7 @@ namespace Tools
          if(string.IsNullOrWhiteSpace(path)) return;
 
          path = path.Trim();
-         EnsureSymbolsRootExists(path);
+         EnsureWorkspaceRootExists(path);
 
          if(!Current.SymbolsRoots.Contains(path, StringComparer.OrdinalIgnoreCase))
             Current.SymbolsRoots.Add(path);
@@ -39,16 +40,16 @@ namespace Tools
       {
          Current.ActiveSymbolsRootIndex = index;
          Current.EnsureDefaults();
-         EnsureSymbolsRootExists(Current.GetActiveSymbolsRoot());
+         EnsureWorkspaceRootExists(Current.GetActiveSymbolsRoot());
          await _store.SaveAsync(Current).ConfigureAwait(false);
       }
 
       public Task SaveAsync() => _store.SaveAsync(Current);
 
-      private static void EnsureSymbolsRootExists(string root)
+      private static void EnsureWorkspaceRootExists(string root)
       {
-         // Create the root and basic recommended structure lazily.
          Directory.CreateDirectory(root);
+         _ = SymbolsFolderResolver.ResolveSymbolsRoot(root, createIfMissing: true);
       }
    }
 }

@@ -5,6 +5,11 @@ namespace Tools
 {
    public sealed class AppSettings
    {
+      // Workspace roots are user-chosen folders that may contain a `Symbols` (case-insensitive) subfolder.
+      // The editor will resolve/create that `Symbols` folder and use it as the actual SymbolsRootPath.
+      public List<string> WorkspaceRoots { get; set; } = new List<string>();
+      public int ActiveWorkspaceRootIndex { get; set; } = 0;
+
       public List<string> SymbolsRoots { get; set; } = new List<string>();
       public int ActiveSymbolsRootIndex { get; set; } = 0;
 
@@ -21,6 +26,15 @@ namespace Tools
 
       public string GetActiveSymbolsRoot()
       {
+         // Prefer WorkspaceRoots when available.
+         if(WorkspaceRoots != null && WorkspaceRoots.Count > 0)
+         {
+            if(ActiveWorkspaceRootIndex < 0 || ActiveWorkspaceRootIndex >= WorkspaceRoots.Count)
+               return WorkspaceRoots[0];
+
+            return WorkspaceRoots[ActiveWorkspaceRootIndex];
+         }
+
          if(SymbolsRoots == null || SymbolsRoots.Count == 0)
             return AppPaths.DefaultSymbolsRoot();
 
