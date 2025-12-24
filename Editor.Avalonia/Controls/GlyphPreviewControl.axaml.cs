@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Core.Models;
 using Editor.Avalonia.Services;
 using Storage.Abstractions.Models;
@@ -100,7 +101,8 @@ public partial class GlyphPreviewControl : UserControl
       set => SetValue(FallbackGlyphProperty, value);
    }
 
-   private void RequestRedraw() => _ = RedrawAsync();
+   private void RequestRedraw()
+      => Dispatcher.UIThread.Post(() => _ = RedrawAsync());
 
    public GlyphBitmap? EditedBitmap => _editable;
 
@@ -119,71 +121,80 @@ public partial class GlyphPreviewControl : UserControl
 
       var gsize = GlyphSize;
       int scale = PixelScale <= 0 ? 10 : PixelScale;
+      var packId = PackId;
+      var style = Style;
+      var glyphId = GlyphId;
+      var fallbackGlyph = FallbackGlyph;
 
-      _canvas.Children.Clear();
-      _canvas.Width = gsize.Width * scale;
-      _canvas.Height = gsize.Height * scale;
+      GlyphBitmap? loaded = null;
+      if(_editable == null || !_editableId.Equals(glyphId) || !_editable.Size.Equals(gsize))
+         loaded = await _cache.GetBitmapAsync(packId, style, glyphId, gsize, fallbackGlyph, CancellationToken.None);
 
-      // Draw pixel grid behind glyph pixels (thin, subtle).
-      var gridBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
-      for(int x = 0; x <= gsize.Width; x++)
+      await Dispatcher.UIThread.InvokeAsync(() =>
       {
-         var line = new Line
+         if(loaded != null)
          {
-            StartPoint = new Point(x * scale + 0.5, 0),
-            EndPoint = new Point(x * scale + 0.5, gsize.Height * scale),
-            Stroke = gridBrush,
-            StrokeThickness = 1,
-            IsHitTestVisible = false
-         };
-         _canvas.Children.Add(line);
-      }
+            _editable = loaded.Clone();
+            _editableId = glyphId;
+         }
 
-      for(int y = 0; y <= gsize.Height; y++)
-      {
-         var line = new Line
+         _canvas.Children.Clear();
+         _canvas.Width = gsize.Width * scale;
+         _canvas.Height = gsize.Height * scale;
+
+         // Draw pixel grid behind glyph pixels (thin, subtle).
+         var gridBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+         for(int x = 0; x <= gsize.Width; x++)
          {
-            StartPoint = new Point(0, y * scale + 0.5),
-            EndPoint = new Point(gsize.Width * scale, y * scale + 0.5),
-            Stroke = gridBrush,
-            StrokeThickness = 1,
-            IsHitTestVisible = false
-         };
-         _canvas.Children.Add(line);
-      }
-
-      // Keep an editable clone for the currently selected glyph.
-      if(_editable == null || !_editableId.Equals(GlyphId) || !_editable.Size.Equals(gsize))
-      {
-         var loaded = await _cache.GetBitmapAsync(PackId, Style, GlyphId, gsize, FallbackGlyph, CancellationToken.None);
-         _editable = loaded.Clone();
-         _editableId = GlyphId;
-      }
-
-      var bmp = _editable;
-      if(bmp == null)
-         return;
-
-      for(int y = 0; y < bmp.Size.Height; y++)
-      {
-         for(int x = 0; x < bmp.Size.Width; x++)
-         {
-            if(!bmp.GetPixel(x, y))
-               continue;
-
-            var rect = new Rectangle
+            var line = new Line
             {
-               Width = scale,
-               Height = scale,
-               Fill = Brushes.White,
+               StartPoint = new Point(x * scale + 0.5, 0),
+               EndPoint = new Point(x * scale + 0.5, gsize.Height * scale),
+               Stroke = gridBrush,
+               StrokeThickness = 1,
                IsHitTestVisible = false
             };
-
-            Canvas.SetLeft(rect, x * scale);
-            Canvas.SetTop(rect, y * scale);
-            _canvas.Children.Add(rect);
+            _canvas.Children.Add(line);
          }
-      }
+
+         for(int y = 0; y <= gsize.Height; y++)
+         {
+            var line = new Line
+            {
+               StartPoint = new Point(0, y * scale + 0.5),
+               EndPoint = new Point(gsize.Width * scale, y * scale + 0.5),
+               Stroke = gridBrush,
+               StrokeThickness = 1,
+               IsHitTestVisible = false
+            };
+            _canvas.Children.Add(line);
+         }
+
+         var bmp = _editable;
+         if(bmp == null)
+            return;
+
+         for(int y = 0; y < bmp.Size.Height; y++)
+         {
+            for(int x = 0; x < bmp.Size.Width; x++)
+            {
+               if(!bmp.GetPixel(x, y))
+                  continue;
+
+               var rect = new Rectangle
+               {
+                  Width = scale,
+                  Height = scale,
+                  Fill = Brushes.White,
+                  IsHitTestVisible = false
+               };
+
+               Canvas.SetLeft(rect, x * scale);
+               Canvas.SetTop(rect, y * scale);
+               _canvas.Children.Add(rect);
+            }
+         }
+      });
    }
 
    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)

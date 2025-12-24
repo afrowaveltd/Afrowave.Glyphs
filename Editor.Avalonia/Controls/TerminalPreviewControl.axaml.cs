@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Core.Models;
 using Core.Text;
 using Editor.Avalonia.Services;
@@ -78,7 +79,13 @@ public partial class TerminalPreviewControl : UserControl
       RequestRedraw();
    }
 
-   private void RequestRedraw() => _ = RedrawAsync();
+   private void RequestRedraw()
+   {
+      if(Dispatcher.UIThread.CheckAccess())
+         _ = RedrawAsync();
+      else
+         Dispatcher.UIThread.Post(() => _ = RedrawAsync());
+   }
 
    public TerminalBuffer Buffer
    {

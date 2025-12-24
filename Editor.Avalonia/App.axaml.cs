@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Core.Naming;
 using Editor.Avalonia.Services;
 using Storage.Abstractions.Abstractions;
@@ -58,13 +59,13 @@ public partial class App : Application
          // 1) Load settings
          var store = new JsonAppSettingsStore();
          var settingsService = new SettingsService(store);
-         await settingsService.InitializeAsync().ConfigureAwait(true);
+         await settingsService.InitializeAsync();
 
-          var workspaceService = new EditorWorkspaceService(settingsService);
+         var workspaceService = new EditorWorkspaceService(settingsService);
 
          var settings = settingsService.Current;
-          string workspaceRoot = settings.GetActiveSymbolsRoot();
-          string symbolsRoot = SymbolsFolderResolver.ResolveSymbolsRoot(workspaceRoot, createIfMissing: true);
+         string workspaceRoot = settings.GetActiveSymbolsRoot();
+         string symbolsRoot = SymbolsFolderResolver.ResolveSymbolsRoot(workspaceRoot, createIfMissing: true);
 
          // 2) Create FS storage services (repo + pack provider)
          IGlyphRepository repo = CreateRepository(symbolsRoot);
@@ -73,34 +74,40 @@ public partial class App : Application
          // 3) ViewModel (sdíletelný i s Consolonia)
          var vm = new MainViewModel(packs, repo);
 
-         // přeneseme uložené hodnoty ze settings do VM
-         vm.Text = settings.LastText;
-         vm.SelectedPackId = settings.LastPackId;
-         vm.SelectedStyle = settings.LastStyle;
+         await Dispatcher.UIThread.InvokeAsync(async () =>
+         {
+            // přeneseme uložené hodnoty ze settings do VM
+            vm.Text = settings.LastText;
+            vm.SelectedPackId = settings.LastPackId;
+            vm.SelectedStyle = settings.LastStyle;
 
-         // načteme packy + styly + render
-         await vm.ReloadAsync().ConfigureAwait(true);
+            // načteme packy + styly + render (na UI thread)
+            await vm.ReloadAsync();
 
-         // 4) Terminal cache pro Avalonia control
-         var cache = new TerminalGlyphCache(repo);
+            // 4) Terminal cache pro Avalonia control
+            var cache = new TerminalGlyphCache(repo);
 
-         // 5) Window
-         var window = new MainWindow();
-         window.DataContext = vm;
-         window.SetTerminalCache(cache);
-          window.SetWorkspace(workspaceService);
+            // 5) Window
+            var window = new MainWindow();
+            window.DataContext = vm;
+            window.SetTerminalCache(cache);
+            window.SetWorkspace(workspaceService);
 
-         desktop.MainWindow = window;
-         window.Show();
-         splash.Close();
+            desktop.MainWindow = window;
+            window.Show();
+            splash.Close();
+         });
       }
       catch(Exception ex)
       {
-         if(splash.Content is TextBlock tb)
+         await Dispatcher.UIThread.InvokeAsync(() =>
          {
-            tb.Text = $"Error: {ex.Message}";
-            tb.Foreground = Brushes.Red;
-         }
+            if(splash.Content is TextBlock tb)
+            {
+               tb.Text = $"Error: {ex.Message}";
+               tb.Foreground = Brushes.Red;
+            }
+         });
       }
    }
 

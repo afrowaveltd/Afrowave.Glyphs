@@ -1,15 +1,16 @@
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using Editor.Avalonia.Services;
-using Core.Naming;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Core.Models;
+using Core.Naming;
+using Editor.Avalonia.Services;
 using Storage.Abstractions.Abstractions;
 using Storage.FileSystem;
-using Tools;
-using Tools.FontImport;
 using System;
 using System.Threading.Tasks;
-using Avalonia.Platform.Storage;
+using Tools;
+using Tools.FontImport;
 
 namespace Editor.Avalonia;
 
@@ -68,8 +69,8 @@ public partial class MainWindow : Window
 
    private void TerminalOnCellClicked(int x, int y)
    {
-      if(DataContext is MainViewModel vm)
-         vm.Text = $"Clicked cell: {x},{y}";
+      // Intentionally no-op: clicking a terminal cell selects a glyph.
+      // Do not overwrite editor text (this was test-only behavior).
    }
 
    public void SetWorkspace(EditorWorkspaceService workspace)
@@ -129,10 +130,13 @@ public partial class MainWindow : Window
 
    private async Task OnGlyphSavedAsync()
    {
-      _currentCache?.Clear();
+      await Dispatcher.UIThread.InvokeAsync(async () =>
+      {
+         _currentCache?.Clear();
 
-      if(DataContext is MainViewModel vm)
-         await vm.RenderAsync().ConfigureAwait(true);
+         if(DataContext is MainViewModel vm)
+            await vm.RenderAsync();
+      });
    }
 
    private async Task OpenWorkspaceAsync()
@@ -189,10 +193,13 @@ public partial class MainWindow : Window
       vm.GlyphSavedHandler = OnGlyphSavedAsync;
       vm.GlyphBitmapReplacedHandler = OnGlyphBitmapReplacedAsync;
 
-      await vm.ReloadAsync().ConfigureAwait(true);
+      await vm.ReloadAsync().ConfigureAwait(false);
 
       var cache = new TerminalGlyphCache(repo);
-      DataContext = vm;
-      _applyRuntime(vm, cache);
+      await Dispatcher.UIThread.InvokeAsync(() =>
+      {
+         DataContext = vm;
+         _applyRuntime(vm, cache);
+      });
    }
 }
