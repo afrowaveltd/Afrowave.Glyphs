@@ -39,9 +39,33 @@ namespace Storage.FileSystem
             var size = ParsePackId(packId);
             return await GlyphHexCodecV1.LoadAsync(path, id, size, cancellationToken).ConfigureAwait(false);
          }
+         catch(InvalidDataException)
+         {
+            // Silently fall back to legacy codec
+            try
+            {
+               return await GlyphFileCodecV1.LoadAsync(path, id, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+               // If both fail, return empty glyph
+               var size = ParsePackId(packId);
+               return new Glyph(id, size, new GlyphBitmap(size, new byte[GlyphBitmap.GetByteLength(size)]));
+            }
+         }
          catch
          {
-            return await GlyphFileCodecV1.LoadAsync(path, id, cancellationToken).ConfigureAwait(false);
+            // For any other error, try legacy codec
+            try
+            {
+               return await GlyphFileCodecV1.LoadAsync(path, id, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+               // Return empty glyph as fallback
+               var size = ParsePackId(packId);
+               return new Glyph(id, size, new GlyphBitmap(size, new byte[GlyphBitmap.GetByteLength(size)]));
+            }
          }
       }
 

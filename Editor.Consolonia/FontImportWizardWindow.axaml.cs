@@ -1,11 +1,11 @@
+using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using Iciclecreek.Avalonia.WindowManager;
 using Tools.FontImport;
 using System.Threading.Tasks;
 
 namespace Editor.Consolonia;
 
-public partial class FontImportWizardWindow : ManagedWindow
+public partial class FontImportWizardWindow : Window
 {
    public FontImportWizardWindow()
    {

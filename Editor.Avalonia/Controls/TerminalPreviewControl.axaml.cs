@@ -63,7 +63,7 @@ public partial class TerminalPreviewControl : UserControl
       AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Bubble);
 
       // Redraw on property changes
-      this.GetObservable(BufferProperty).Subscribe(_ => RequestRedraw());
+      this.GetObservable(BufferProperty).Subscribe(_ => { ClearSelection(); RequestRedraw(); });
       this.GetObservable(GlyphSizeProperty).Subscribe(_ => RequestRedraw());
       this.GetObservable(PixelScaleProperty).Subscribe(_ => RequestRedraw());
       this.GetObservable(ShowGridProperty).Subscribe(_ => RequestRedraw());
@@ -310,7 +310,7 @@ public partial class TerminalPreviewControl : UserControl
             {
                Width = scale,
                Height = scale,
-               Fill = Brushes.White,
+               Fill = new SolidColorBrush(Color.FromRgb(0, 255, 0)), // Bright green (Hercules style)
                IsHitTestVisible = false
             };
 

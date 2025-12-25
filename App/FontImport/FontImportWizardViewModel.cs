@@ -19,11 +19,30 @@ namespace Tools.FontImport
 
       public ObservableCollection<GridSize> Presets { get; } = new ObservableCollection<GridSize>
       {
-         new GridSize(5, 8),
-         new GridSize(5, 10),
-         new GridSize(8, 16),
-         new GridSize(16, 16),
-         new GridSize(32, 32)
+         // LCD Character Displays (HD44780, OLED modules)
+         new GridSize(5, 7),    // Tiny 5x7 (classic LCD)
+         new GridSize(5, 8),    // Standard LCD character
+         new GridSize(6, 8),    // 6x8 LCD
+         new GridSize(5, 10),   // Taller LCD variant
+
+         // Classic computer fonts
+         new GridSize(7, 9),    // CGA/EGA
+         new GridSize(8, 8),    // Square 8x8 (C64, ZX Spectrum)
+         new GridSize(8, 14),   // VGA text mode
+         new GridSize(8, 16),   // Standard VGA/BIOS font
+         new GridSize(9, 16),   // VGA 9-wide variant
+
+         // Modern terminal / editor fonts
+         new GridSize(10, 20),  // 2x scale of 5x10
+         new GridSize(12, 16),  // Wide proportional
+         new GridSize(16, 16),  // Square pixel art
+         new GridSize(16, 32),  // Tall, detailed
+
+         // High resolution / pixel art
+         new GridSize(24, 24),  // Medium detail
+         new GridSize(32, 32),  // High detail
+         new GridSize(48, 48),  // Very high detail
+         new GridSize(64, 64),  // Ultra detail
       };
 
       private string? _fontPath;
@@ -67,6 +86,9 @@ namespace Tools.FontImport
       private bool _isRunning;
       public bool IsRunning { get => _isRunning; private set => Set(ref _isRunning, value); }
 
+      private bool _overwriteExisting = false;
+      public bool OverwriteExisting { get => _overwriteExisting; set => Set(ref _overwriteExisting, value); }
+
       public AsyncCommand StartCommand { get; }
       public AsyncCommand PickFontCommand { get; }
       public AsyncCommand NextCommand { get; }
@@ -74,6 +96,8 @@ namespace Tools.FontImport
       public AsyncCommand PreviousCommand { get; }
       public AsyncCommand CancelCommand { get; }
       public AsyncCommand FinishCommand { get; }
+      public AsyncCommand ImportRangeCommand { get; }
+      public AsyncCommand ImportAllCommand { get; }
 
       private CancellationTokenSource? _cts;
 
@@ -85,6 +109,7 @@ namespace Tools.FontImport
       public Func<Task>? CloseHandler { get; set; }
       public Func<GlyphBitmap?, Task>? ApplyBitmapToEditorHandler { get; set; }
       public Func<Task<GlyphBitmap?>>? ReadBitmapFromEditorHandler { get; set; }
+      public Func<Task>? GlyphSavedHandler { get; set; } // Called after each glyph is saved to refresh preview
 
       public FontImportWizardViewModel(FontImportService import)
       {
@@ -97,6 +122,8 @@ namespace Tools.FontImport
          PreviousCommand = new AsyncCommand(PreviousAsync);
          CancelCommand = new AsyncCommand(CancelAsync);
          FinishCommand = new AsyncCommand(FinishAsync);
+         ImportRangeCommand = new AsyncCommand(ImportRangeAsync);
+         ImportAllCommand = new AsyncCommand(ImportAllAsync);
       }
 
       public async Task PickFontAsync()
@@ -185,12 +212,20 @@ namespace Tools.FontImport
             {
                await _import.SaveGlyphAsync(PackId, Style, GlyphId.FromUnicode(CurrentCodePoint), GlyphSize, edited, _cts.Token).ConfigureAwait(false);
                Status = "Saved.";
+
+               // Refresh preview after saving
+               if(GlyphSavedHandler != null)
+                  await GlyphSavedHandler().ConfigureAwait(false);
             }
             else
             {
                 // Save the current bitmap if no editing is done
                 await _import.SaveGlyphAsync(PackId, Style, GlyphId.FromUnicode(CurrentCodePoint), GlyphSize, CurrentBitmap, _cts.Token).ConfigureAwait(false);
                 Status = "Saved without editing.";
+
+                // Refresh preview after saving
+                if(GlyphSavedHandler != null)
+                   await GlyphSavedHandler().ConfigureAwait(false);
             }
          }
          catch(Exception ex)
@@ -230,21 +265,165 @@ namespace Tools.FontImport
          return Task.CompletedTask;
       }
 
-      public async Task FinishAsync()
-      {
-         await CancelAsync().ConfigureAwait(false);
-         if(CloseHandler != null)
-            await CloseHandler().ConfigureAwait(false);
-      }
+            public async Task FinishAsync()
+            {
+               await CancelAsync().ConfigureAwait(false);
+               if(CloseHandler != null)
+                  await CloseHandler().ConfigureAwait(false);
+            }
 
-      private void Notify(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            public async Task ImportRangeAsync()
+            {
+               if(string.IsNullOrWhiteSpace(FontPath))
+               {
+                  Status = "No font selected.";
+                  return;
+               }
 
-      private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
-      {
-         if(Equals(field, value)) return false;
-         field = value;
-         Notify(name!);
-         return true;
+               if(RangeEnd < RangeStart)
+               {
+                  Status = "Range end must be >= range start.";
+                  return;
+               }
+
+               IsRunning = true;
+               _cts = new CancellationTokenSource();
+
+               int imported = 0;
+               int skipped = 0;
+               int failed = 0;
+
+               for(int cp = RangeStart; cp <= RangeEnd; cp++)
+               {
+                  if(_cts.Token.IsCancellationRequested)
+                     break;
+
+                  try
+                  {
+                     // Check if glyph already exists
+                     if(!OverwriteExisting)
+                     {
+                        var exists = await _import.Repository.ExistsAsync(PackId, Style, GlyphId.FromUnicode(cp), _cts.Token).ConfigureAwait(false);
+                        if(exists)
+                        {
+                           skipped++;
+                           Status = $"Importing range... {cp - RangeStart + 1}/{RangeEnd - RangeStart + 1} (Skipped: {skipped})";
+                           continue;
+                        }
+                     }
+
+                     // Rasterize glyph
+                     var bmp = await new FontGlyphRasterizer().RasterizeAsync(FontPath!, cp, GlyphSize, _cts.Token).ConfigureAwait(false);
+
+                     // Save glyph
+                     await _import.SaveGlyphAsync(PackId, Style, GlyphId.FromUnicode(cp), GlyphSize, bmp, _cts.Token).ConfigureAwait(false);
+                     imported++;
+                     Status = $"Importing range... {cp - RangeStart + 1}/{RangeEnd - RangeStart + 1} (Imported: {imported}, Skipped: {skipped})";
+                  }
+                  catch(Exception)
+                  {
+                     failed++;
+                  }
+               }
+
+                  IsRunning = false;
+                  Status = $"Range import complete! Imported: {imported}, Skipped: {skipped}, Failed: {failed}";
+
+                  // Refresh preview after import
+                  if(GlyphSavedHandler != null)
+                     await GlyphSavedHandler().ConfigureAwait(false);
+               }
+
+            public async Task ImportAllAsync()
+            {
+               if(string.IsNullOrWhiteSpace(FontPath))
+               {
+                  Status = "No font selected.";
+                  return;
+               }
+
+               IsRunning = true;
+               _cts = new CancellationTokenSource();
+
+               int imported = 0;
+               int skipped = 0;
+               int failed = 0;
+               int total = 0;
+
+               // Import all Unicode Basic Multilingual Plane (0x0000 - 0xFFFF)
+               // This covers most characters used in practice
+               for(int cp = 0; cp <= 0xFFFF; cp++)
+               {
+                  if(_cts.Token.IsCancellationRequested)
+                     break;
+
+                  total++;
+
+                  try
+                  {
+                     // Check if glyph already exists
+                     if(!OverwriteExisting)
+                     {
+                        var exists = await _import.Repository.ExistsAsync(PackId, Style, GlyphId.FromUnicode(cp), _cts.Token).ConfigureAwait(false);
+                        if(exists)
+                        {
+                           skipped++;
+                           if(total % 100 == 0) // Update status every 100 characters
+                              Status = $"Scanning Unicode... {total}/65536 (Imported: {imported}, Skipped: {skipped})";
+                           continue;
+                        }
+                     }
+
+                     // Rasterize glyph
+                     var bmp = await new FontGlyphRasterizer().RasterizeAsync(FontPath!, cp, GlyphSize, _cts.Token).ConfigureAwait(false);
+
+                     // Check if glyph is empty (font doesn't have this character)
+                     bool isEmpty = true;
+                     for(int y = 0; y < bmp.Size.Height && isEmpty; y++)
+                     {
+                        for(int x = 0; x < bmp.Size.Width && isEmpty; x++)
+                        {
+                           if(bmp.GetPixel(x, y))
+                              isEmpty = false;
+                        }
+                     }
+
+                     if(isEmpty)
+                     {
+                        skipped++;
+                     }
+                     else
+                     {
+                        // Save glyph
+                        await _import.SaveGlyphAsync(PackId, Style, GlyphId.FromUnicode(cp), GlyphSize, bmp, _cts.Token).ConfigureAwait(false);
+                        imported++;
+                     }
+
+                     if(total % 100 == 0) // Update status every 100 characters
+                        Status = $"Scanning Unicode... {total}/65536 (Imported: {imported}, Skipped: {skipped})";
+                  }
+                  catch(Exception)
+                  {
+                     failed++;
+                  }
+               }
+
+                  IsRunning = false;
+                  Status = $"Full import complete! Imported: {imported}, Skipped: {skipped}, Failed: {failed}";
+
+                  // Refresh preview after import
+                  if(GlyphSavedHandler != null)
+                     await GlyphSavedHandler().ConfigureAwait(false);
+               }
+
+            private void Notify(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+            private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+            {
+               if(Equals(field, value)) return false;
+               field = value;
+               Notify(name!);
+               return true;
+            }
+         }
       }
-   }
-}

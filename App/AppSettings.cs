@@ -24,6 +24,8 @@ namespace Tools
       public bool ShowGrid { get; set; } = true;
       public bool HighlightFallback { get; set; } = true;
 
+      public string Theme { get; set; } = "Dark";
+
       public string GetActiveSymbolsRoot()
       {
          // Prefer WorkspaceRoots when available.

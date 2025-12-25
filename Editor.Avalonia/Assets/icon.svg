@@ -1,0 +1,47 @@
+<!-- Afrowave Glyph Editor Icon - 256x256 -->
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background - Dark -->
+  <rect width="256" height="256" fill="#1a1a1a" rx="24"/>
+  
+  <!-- Grid pattern (subtle) -->
+  <defs>
+    <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
+      <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#2a2a2a" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="256" height="256" fill="url(#grid)"/>
+  
+  <!-- Main pixel art "A" letter in Hercules green -->
+  <g transform="translate(64, 48)">
+    <!-- Letter A in pixel art style -->
+    <rect x="48" y="0" width="16" height="16" fill="#00ff00"/> <!-- Top -->
+    
+    <rect x="32" y="16" width="16" height="16" fill="#00ff00"/> <!-- Left upper -->
+    <rect x="64" y="16" width="16" height="16" fill="#00ff00"/> <!-- Right upper -->
+    
+    <rect x="16" y="32" width="16" height="16" fill="#00ff00"/> <!-- Left middle -->
+    <rect x="80" y="32" width="16" height="16" fill="#00ff00"/> <!-- Right middle -->
+    
+    <rect x="16" y="48" width="80" height="16" fill="#00ff00"/> <!-- Horizontal bar -->
+    
+    <rect x="0" y="64" width="16" height="80" fill="#00ff00"/> <!-- Left leg -->
+    <rect x="96" y="64" width="16" height="80" fill="#00ff00"/> <!-- Right leg -->
+  </g>
+  
+  <!-- African pattern accent (orange/yellow) -->
+  <circle cx="200" cy="56" r="8" fill="#ff8800"/>
+  <circle cx="56" cy="200" r="8" fill="#ffaa00"/>
+  
+  <!-- Pixel grid indicator (bottom right) -->
+  <g transform="translate(180, 180)">
+    <rect x="0" y="0" width="8" height="8" fill="#00aa00"/>
+    <rect x="12" y="0" width="8" height="8" fill="#00aa00"/>
+    <rect x="24" y="0" width="8" height="8" fill="#00aa00"/>
+    <rect x="0" y="12" width="8" height="8" fill="#00aa00"/>
+    <rect x="12" y="12" width="8" height="8" fill="#00ff00"/>
+    <rect x="24" y="12" width="8" height="8" fill="#00aa00"/>
+    <rect x="0" y="24" width="8" height="8" fill="#00aa00"/>
+    <rect x="12" y="24" width="8" height="8" fill="#00aa00"/>
+    <rect x="24" y="24" width="8" height="8" fill="#00aa00"/>
+  </g>
+</svg>

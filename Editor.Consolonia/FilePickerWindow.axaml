@@ -2,9 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Editor.Consolonia"
         x:Class="Editor.Consolonia.FilePickerWindow"
+        x:CompileBindings="False"
         Width="100" Height="30"
-        Title="Select file"
-        x:DataType="local:FilePickerViewModel">
+        Title="Select file">
 
   <StackPanel Spacing="1">
     <TextBlock Text="Directory:" />

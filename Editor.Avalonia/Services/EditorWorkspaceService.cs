@@ -19,6 +19,19 @@ namespace Editor.Avalonia.Services
 
       public string CurrentWorkspaceRoot => _settings.Current.GetActiveSymbolsRoot();
 
+      public static string GetDefaultWorkspaceRoot()
+      {
+         // Default: Documents/Afrowave/GlyphEditor
+         var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+         var defaultPath = Path.Combine(documents, "Afrowave", "GlyphEditor");
+
+         // Create if it doesn't exist
+         if(!Directory.Exists(defaultPath))
+            Directory.CreateDirectory(defaultPath);
+
+         return defaultPath;
+      }
+
       public string ResolveSymbolsFolder(string workspaceRoot)
          => SymbolsFolderResolver.ResolveSymbolsRoot(workspaceRoot, createIfMissing: true);
 

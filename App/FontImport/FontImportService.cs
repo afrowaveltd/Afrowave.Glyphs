@@ -14,6 +14,8 @@ namespace Tools.FontImport
       private readonly IGlyphRepository _repo;
       private readonly FontGlyphRasterizer _rasterizer;
 
+      public IGlyphRepository Repository => _repo;
+
       public FontImportService(IGlyphRepository repo, FontGlyphRasterizer rasterizer)
       {
          _repo = repo ?? throw new ArgumentNullException(nameof(repo));

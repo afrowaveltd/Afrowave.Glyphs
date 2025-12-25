@@ -2,9 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:tools="clr-namespace:Tools.FontImport;assembly=Tools"
         x:Class="Editor.Consolonia.FontImportWizardWindow"
+        x:CompileBindings="False"
         Width="100" Height="30"
-        Title="Import font"
-        x:DataType="tools:FontImportWizardViewModel">
+        Title="Import font">
 
   <StackPanel Spacing="1">
     <TextBlock Text="Font:"/>
@@ -22,26 +22,33 @@
     <TextBlock Text="Range start (decimal):"/>
     <TextBox Text="{Binding RangeStart}" />
 
-    <TextBlock Text="Range end (decimal):"/>
-    <TextBox Text="{Binding RangeEnd}" />
+        <TextBlock Text="Range end (decimal):"/>
+        <TextBox Text="{Binding RangeEnd}" />
 
-    <TextBlock Text="Current:"/>
-    <TextBlock Text="{Binding CurrentGlyphIdText}" />
-    <TextBlock Text="{Binding ProgressText}" />
-    <TextBlock Text="{Binding CurrentChar}" />
+        <CheckBox IsChecked="{Binding OverwriteExisting}" Content="Overwrite existing" />
 
-    <TextBlock Opacity="0.8" Text="Tip: editor opens on load. Enter/N accept, K skips." />
+        <TextBlock Text="Current:"/>
+        <TextBlock Text="{Binding CurrentGlyphIdText}" />
+        <TextBlock Text="{Binding ProgressText}" />
+        <TextBlock Text="{Binding CurrentChar}" />
 
-    <TextBlock Text="Status:"/>
-    <TextBlock Text="{Binding Status}" />
+        <TextBlock Opacity="0.8" Text="Tip: editor opens on load. Enter/N accept, K skips." />
 
-    <StackPanel Orientation="Horizontal" Spacing="1">
-      <Button Content="Start" Command="{Binding StartCommand}" />
-      <Button Content="Prev" Command="{Binding PreviousCommand}" />
-      <Button Content="Skip" Command="{Binding SkipCommand}" />
-      <Button Content="Next (Save)" Command="{Binding NextCommand}" />
-      <Button Content="Cancel" Command="{Binding CancelCommand}" />
-      <Button Content="Close" Command="{Binding FinishCommand}" />
-    </StackPanel>
-  </StackPanel>
-</Window>
+        <TextBlock Text="Status:"/>
+        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+
+        <StackPanel Orientation="Horizontal" Spacing="1">
+          <Button Content="Import Range" Command="{Binding ImportRangeCommand}" />
+          <Button Content="Import All" Command="{Binding ImportAllCommand}" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="1">
+          <Button Content="Start" Command="{Binding StartCommand}" />
+          <Button Content="Prev" Command="{Binding PreviousCommand}" />
+          <Button Content="Skip" Command="{Binding SkipCommand}" />
+          <Button Content="Next (Save)" Command="{Binding NextCommand}" />
+          <Button Content="Cancel" Command="{Binding CancelCommand}" />
+          <Button Content="Close" Command="{Binding FinishCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Window>

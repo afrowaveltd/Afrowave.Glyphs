@@ -28,14 +28,30 @@ namespace Tools
 
       public ObservableCollection<GridSize> GlyphSizePresets { get; } = new ObservableCollection<GridSize>
       {
-         // Common character displays (HD44780 and similar)
-         new GridSize(5, 8),
-         new GridSize(5, 10),
+         // LCD Character Displays (HD44780, OLED modules)
+         new GridSize(5, 7),    // Tiny 5x7 (classic LCD)
+         new GridSize(5, 8),    // Standard LCD character
+         new GridSize(6, 8),    // 6x8 LCD
+         new GridSize(5, 10),   // Taller LCD variant
 
-         // Editor / terminal-friendly sizes
-         new GridSize(8, 16),
-         new GridSize(16, 16),
-         new GridSize(32, 32)
+         // Classic computer fonts
+         new GridSize(7, 9),    // CGA/EGA
+         new GridSize(8, 8),    // Square 8x8 (C64, ZX Spectrum)
+         new GridSize(8, 14),   // VGA text mode
+         new GridSize(8, 16),   // Standard VGA/BIOS font
+         new GridSize(9, 16),   // VGA 9-wide variant
+
+         // Modern terminal / editor fonts
+         new GridSize(10, 20),  // 2x scale of 5x10
+         new GridSize(12, 16),  // Wide proportional
+         new GridSize(16, 16),  // Square pixel art
+         new GridSize(16, 32),  // Tall, detailed
+
+         // High resolution / pixel art
+         new GridSize(24, 24),  // Medium detail
+         new GridSize(32, 32),  // High detail
+         new GridSize(48, 48),  // Very high detail
+         new GridSize(64, 64),  // Ultra detail
       };
 
       private string _selectedPackId = "8x16";
@@ -44,6 +60,12 @@ namespace Tools
          get => _selectedPackId;
          set
          {
+            // Ensure the pack is in the collection (in case it's a new size)
+            if(!string.IsNullOrWhiteSpace(value) && !PackIds.Contains(value))
+            {
+               PackIds.Add(value);
+            }
+
             if(Set(ref _selectedPackId, value))
             {
                UpdateSelectedGlyphSizeFromPackId(value);
@@ -58,12 +80,16 @@ namespace Tools
          get => _selectedStyle;
          set
          {
+            // Ignore attempts to set default/empty struct value (happens when ComboBox loses selection)
+            if(string.IsNullOrEmpty(value.Name))
+               return;
+
             if(Set(ref _selectedStyle, value))
                _ = RenderAsync();
          }
       }
 
-      private GlyphId _selectedGlyph = GlyphId.FromInternal("missing");
+      private GlyphId _selectedGlyph = GlyphId.FromUnicode('H');
       public GlyphId SelectedGlyph
       {
          get => _selectedGlyph;
@@ -73,13 +99,16 @@ namespace Tools
             {
                // SelectedGlyphText je odvozená vlastnost, musíme ji oznámit ručně
                Notify(nameof(SelectedGlyphText));
+
+               // Reset EditedBitmap when glyph changes, so preview loads fresh from cache
+               EditedBitmap = null;
             }
          }
       }
 
       public string SelectedGlyphText => _selectedGlyph.ToString();
 
-      private string _text = "Hello BOS 👋\r\nAfrowave Glyphs!";
+      private string _text = "A: \\u0041\r\nB: \\u0042\r\nCurrent editing: {current}";
       public string Text
       {
          get => _text;
@@ -105,15 +134,30 @@ namespace Tools
          {
             if(Set(ref _selectedGlyphSize, value))
             {
+               // Update custom width/height fields to match
+               _customGlyphWidth = value.Width;
+               _customGlyphHeight = value.Height;
+               Notify(nameof(CustomGlyphWidth));
+               Notify(nameof(CustomGlyphHeight));
+               Notify(nameof(GlyphSize)); // IMPORTANT: Notify GlyphSize for backward compatibility
+
                // keep pack id in sync with sizes like "8x16" when user picks a preset/custom size
                var asPackId = value.ToString();
                if(!string.Equals(SelectedPackId, asPackId, StringComparison.OrdinalIgnoreCase))
-                  _selectedPackId = asPackId;
+               {
+                  // Use the public property to trigger ReloadAsync and property change
+                  SelectedPackId = asPackId;
+               }
 
-               // if a glyph is currently edited, reset to new size
+               // Always reset edited bitmap when size changes
                EditedBitmap = null;
                IsGlyphDirty = false;
-               _ = RenderAsync();
+
+               // Clear cache when size changes so preview reloads glyphs with new size
+               if(GlyphSavedHandler != null)
+                  _ = GlyphSavedHandler(); // This will clear cache and re-render
+               else
+                  _ = RenderAsync();
             }
          }
       }
@@ -156,15 +200,22 @@ namespace Tools
       public AsyncCommand OpenWorkspaceCommand { get; }
       public AsyncCommand CreateSymbolsCommand { get; }
       public AsyncCommand ImportFontCommand { get; }
+      public AsyncCommand CreatePackCommand { get; }
+      public AsyncCommand CreateStyleCommand { get; }
       public AsyncCommand SaveGlyphCommand { get; }
       public AsyncCommand ClearGlyphCommand { get; }
       public AsyncCommand RevertGlyphCommand { get; }
+      public AsyncCommand CloneGlyphCommand { get; }
 
       public Func<Task>? OpenWorkspaceHandler { get; set; }
       public Func<Task>? CreateSymbolsHandler { get; set; }
       public Func<Task>? ImportFontHandler { get; set; }
+      public Func<Task>? CreatePackHandler { get; set; }
+      public Func<Task>? CreateStyleHandler { get; set; }
       public Func<Task>? GlyphSavedHandler { get; set; }
       public Func<GlyphId, GlyphBitmap, Task>? GlyphBitmapReplacedHandler { get; set; }
+      public Func<Task>? CloneGlyphHandler { get; set; }
+      public Func<Task>? UnicodeRangeWizardHandler { get; set; }
 
       private GlyphBitmap? _editedBitmap;
       public GlyphBitmap? EditedBitmap
@@ -202,9 +253,12 @@ namespace Tools
          OpenWorkspaceCommand = new AsyncCommand(() => OpenWorkspaceHandler?.Invoke() ?? Task.CompletedTask);
          CreateSymbolsCommand = new AsyncCommand(() => CreateSymbolsHandler?.Invoke() ?? Task.CompletedTask);
          ImportFontCommand = new AsyncCommand(() => ImportFontHandler?.Invoke() ?? Task.CompletedTask);
+         CreatePackCommand = new AsyncCommand(() => CreatePackHandler?.Invoke() ?? Task.CompletedTask);
+         CreateStyleCommand = new AsyncCommand(() => CreateStyleHandler?.Invoke() ?? Task.CompletedTask);
          SaveGlyphCommand = new AsyncCommand(SaveSelectedGlyphAsync);
          ClearGlyphCommand = new AsyncCommand(ClearSelectedGlyphAsync);
          RevertGlyphCommand = new AsyncCommand(RevertSelectedGlyphAsync);
+         CloneGlyphCommand = new AsyncCommand(() => CloneGlyphHandler?.Invoke() ?? Task.CompletedTask);
       }
 
       private void UpdateSelectedGlyphSizeFromPackId(string? packId)
@@ -302,8 +356,15 @@ namespace Tools
          PackIds.Clear();
 
          var list = await _packs.ListPacksAsync(CancellationToken.None).ConfigureAwait(false);
+         System.Diagnostics.Debug.WriteLine($"[RELOAD] ListPacksAsync returned {list.Count} packs");
+
          foreach(var p in list)
+         {
+            System.Diagnostics.Debug.WriteLine($"[RELOAD] Adding pack: {p.PackId}");
             PackIds.Add(p.PackId);
+         }
+
+         System.Diagnostics.Debug.WriteLine($"[RELOAD] PackIds.Count = {PackIds.Count}");
 
          if(PackIds.Count > 0)
          {
@@ -313,34 +374,115 @@ namespace Tools
          }
 
          await ReloadStylesAndRenderAsync().ConfigureAwait(false);
+
+         // Clear cache to reload glyphs from disk
+         if(GlyphSavedHandler != null)
+            await GlyphSavedHandler().ConfigureAwait(false);
+
+         // Auto-select first character of text after successful load
+         if(!string.IsNullOrEmpty(Text))
+         {
+            SelectedGlyph = GlyphId.FromUnicode((int)Text[0]);
+         }
       }
 
       private async Task ReloadStylesAndRenderAsync()
       {
-         Styles.Clear();
+         var previousStyle = SelectedStyle;
 
          if(!string.IsNullOrWhiteSpace(SelectedPackId))
          {
             var styles = await _packs.ListStylesAsync(SelectedPackId, CancellationToken.None).ConfigureAwait(false);
-            foreach(var s in styles)
-               Styles.Add(s);
+
+            // If no styles returned, ensure we have at least _base_
+            if(styles.Count == 0)
+            {
+               var defaultStyle = new FontStyleId("_base_");
+               // Add to collection
+               if(Styles.Count == 0 || !Styles.Contains(defaultStyle))
+               {
+                  Styles.Clear();
+                  Styles.Add(defaultStyle);
+               }
+            }
+            else
+            {
+               // Update collection without clearing to avoid null binding issues
+               // Remove styles that are no longer present
+               for(int i = Styles.Count - 1; i >= 0; i--)
+               {
+                  bool found = false;
+                  foreach(var s in styles)
+                  {
+                     if(Styles[i].Equals(s))
+                     {
+                        found = true;
+                        break;
+                     }
+                  }
+                  if(!found)
+                     Styles.RemoveAt(i);
+               }
+
+               // Add new styles
+               foreach(var s in styles)
+               {
+                  bool found = false;
+                  foreach(var existing in Styles)
+                  {
+                     if(existing.Equals(s))
+                     {
+                        found = true;
+                        break;
+                     }
+                  }
+                  if(!found)
+                     Styles.Add(s);
+               }
+            }
+         }
+         else
+         {
+            // If no pack selected, ensure we have at least _base_
+            if(Styles.Count == 0)
+            {
+               Styles.Add(new FontStyleId("_base_"));
+            }
+         }
+
+         // Ensure we always have at least one style
+         if(Styles.Count == 0)
+         {
+            Styles.Add(new FontStyleId("_base_"));
          }
 
          // Ensure selection exists
          if(Styles.Count > 0)
          {
             bool found = false;
-            foreach(var s in Styles)
+
+            // Only try to restore previous style if it has a valid name
+            if(!string.IsNullOrEmpty(previousStyle.Name))
             {
-               if(s.Equals(SelectedStyle))
+               foreach(var s in Styles)
                {
-                  found = true;
-                  break;
+                  if(s.Equals(previousStyle))
+                  {
+                     found = true;
+                     break;
+                  }
                }
             }
 
             if(!found)
+            {
+               // Select first style (should be _base_)
                SelectedStyle = Styles[0];
+            }
+            else if(!SelectedStyle.Equals(previousStyle))
+            {
+               SelectedStyle = previousStyle;
+            }
          }
 
          await RenderAsync().ConfigureAwait(false);
@@ -365,10 +507,21 @@ namespace Tools
             h = 10;
          }
 
+         // Process UTF escape sequences in preview text
+         string processedText = ProcessUtfEscapes(Text);
+
+         // Add current edited glyph preview if EditedBitmap exists
+         if(EditedBitmap != null && SelectedGlyph.IsUnicode && SelectedGlyph.UnicodeCodePoint.HasValue)
+         {
+            // Temporarily save edited bitmap to repository cache so renderer can find it
+            var tempGlyph = new Glyph(SelectedGlyph, GlyphSize, EditedBitmap.Clone());
+            await _repo.SaveAsync(SelectedPackId, SelectedStyle, tempGlyph, CancellationToken.None).ConfigureAwait(false);
+         }
+
          var buffer = await _renderer.RenderAsync(
              SelectedPackId,
              SelectedStyle,
-             Text,
+             processedText,
              w,
              h,
              FallbackGlyph,
@@ -377,6 +530,39 @@ namespace Tools
          ).ConfigureAwait(false);
 
          PreviewBuffer = buffer;
+      }
+
+      private string ProcessUtfEscapes(string input)
+      {
+         if(string.IsNullOrEmpty(input))
+            return input;
+
+         var result = input;
+
+         // {current} -> Currently edited glyph
+         if(result.Contains("{current}"))
+         {
+            char currentChar = SelectedGlyph.IsUnicode && SelectedGlyph.UnicodeCodePoint.HasValue
+               ? (char)SelectedGlyph.UnicodeCodePoint.Value
+               : '?';
+            result = result.Replace("{current}", currentChar.ToString());
+         }
+
+         // \uXXXX -> Unicode character (4 hex digits)
+         result = System.Text.RegularExpressions.Regex.Replace(result, @"\\u([0-9A-Fa-f]{4})", m =>
+         {
+            int codePoint = int.Parse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber);
+            return char.ConvertFromUtf32(codePoint);
+         });
+
+         // \U+XXXX or {U+XXXX} -> Unicode character (flexible hex)
+         result = System.Text.RegularExpressions.Regex.Replace(result, @"(?:\\U\+|{U\+)([0-9A-Fa-f]+)\}?", m =>
+         {
+            int codePoint = int.Parse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber);
+            return char.ConvertFromUtf32(codePoint);
+         });
+
+         return result;
       }
 
       // --- Helper: ruční oznámení změny odvozených vlastností ---

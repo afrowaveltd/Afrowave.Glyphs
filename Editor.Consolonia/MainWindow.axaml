@@ -1,15 +1,86 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:console="https://github.com/jinek/consolonia"
         xmlns:local="clr-namespace:Editor.Consolonia"
+        xmlns:controls="clr-namespace:Editor.Avalonia.Controls;assembly=Editor.Avalonia"
         x:Class="Editor.Consolonia.MainWindow"
         RequestedThemeVariant="Dark"
-        Title="Consolonia">
-    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="1">
-        <TextBlock Text="Afrowave Glyph Editor (Consolonia)" />
-        <Button Content="_Import Font…" Command="{Binding StartImportCommand}" />
-        <Button Content="_Exit" Click="OnExit" />
+        Title="Afrowave Glyph Editor (TUI)"
+        Width="120" Height="40">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <!-- Top buttons -->
+    <StackPanel Orientation="Horizontal" Spacing="1" Grid.Row="0" Margin="0,0,0,1">
+      <Button Content="Workspace" Command="{Binding OpenWorkspaceCommand}" />
+      <Button Content="New Style" Command="{Binding CreateStyleCommand}" />
+      <Button Content="Import" Command="{Binding ImportFontCommand}" />
+      <Button Content="Symbols" Command="{Binding CreateSymbolsCommand}" />
+      <Button Content="Range" Click="OnUnicodeRange" />
+      <Button Content="Exit" Click="OnExit" />
     </StackPanel>
+
+    <!-- Pack, Style, Size -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,*,Auto,*" Margin="0,0,0,1">
+      <TextBlock Text="Pack:" VerticalAlignment="Center" Grid.Column="0" Margin="1,0"/>
+      <ComboBox ItemsSource="{Binding PackIds}" 
+                SelectedItem="{Binding SelectedPackId}" 
+                Width="10" 
+                Grid.Column="1" />
+
+      <TextBlock Text="Style:" VerticalAlignment="Center" Grid.Column="2" Margin="1,0"/>
+      <ComboBox ItemsSource="{Binding Styles}" 
+                SelectedItem="{Binding SelectedStyle}" 
+                Width="10" 
+                Grid.Column="3">
+        <ComboBox.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+
+      <TextBlock Text="Size:" VerticalAlignment="Center" Grid.Column="4" Margin="1,0"/>
+      <TextBlock Text="{Binding SelectedGlyphSize}" VerticalAlignment="Center" Grid.Column="5" />
+    </Grid>
+
+    <!-- Main content -->
+    <Grid Grid.Row="2" ColumnDefinitions="35,*">
+      <!-- Left panel - Editor -->
+      <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0" Padding="1">
+        <StackPanel Spacing="1">
+          <TextBlock Text="Editor" FontWeight="Bold" />
+          <TextBlock Text="{Binding SelectedGlyphText}" Foreground="Cyan"/>
+
+          <StackPanel Spacing="1" Margin="0,5,0,0">
+            <Button Content="Save" Command="{Binding SaveGlyphCommand}" IsEnabled="{Binding IsGlyphDirty}" />
+            <Button Content="Revert" Command="{Binding RevertGlyphCommand}" />
+            <Button Content="Clear" Command="{Binding ClearGlyphCommand}" />
+            <Button Content="Clone" Click="OnCloneGlyph" />
+            <Button Content="Edit" Click="OnEditGlyph" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Right panel - Preview -->
+      <Grid Grid.Column="1" RowDefinitions="Auto,*">
+        <StackPanel Grid.Row="0" Margin="1">
+          <TextBlock Text="Preview" FontWeight="Bold" />
+          <TextBox Text="{Binding Text}" AcceptsReturn="False" />
+        </StackPanel>
+
+        <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="1">
+          <TextBlock Text="Preview will appear here" 
+                     HorizontalAlignment="Center" 
+                     VerticalAlignment="Center"/>
+        </Border>
+      </Grid>
+    </Grid>
+
+    <!-- Status bar -->
+    <TextBlock Grid.Row="3" 
+               Text="{Binding Title, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}" 
+               Margin="1,1,1,0" />
+  </Grid>
 </Window>

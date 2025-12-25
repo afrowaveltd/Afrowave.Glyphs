@@ -1,12 +1,11 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
-using Iciclecreek.Avalonia.WindowManager;
 using System.Threading.Tasks;
 
 namespace Editor.Consolonia;
 
-public partial class GlyphEditorWindow : ManagedWindow
+public partial class GlyphEditorWindow : Window
 {
    private bool _accepted;
    private bool _skip;
@@ -19,13 +18,18 @@ public partial class GlyphEditorWindow : ManagedWindow
 
    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
-   public async Task<bool> EditAsync(GlyphEditorViewModel vm, Window owner)
+   public async Task<bool> EditAsync(GlyphEditorViewModel vm, Window? owner = null)
    {
       DataContext = vm;
       _accepted = false;
       _skip = false;
       Focus();
-      await ShowDialog(owner).ConfigureAwait(true);
+
+      if(owner != null)
+         await ShowDialog(owner).ConfigureAwait(true);
+      else
+         Show();
+
       return _accepted;
    }
 

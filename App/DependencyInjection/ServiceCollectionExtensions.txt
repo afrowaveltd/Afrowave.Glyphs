@@ -1,0 +1,90 @@
+using Microsoft.Extensions.DependencyInjection;
+using Storage.Abstractions.Abstractions;
+using Storage.FileSystem;
+using Core.Naming;
+using Tools.Localization;
+using Tools.FontImport;
+using Editor.Avalonia.Services;
+
+namespace Tools.DependencyInjection
+{
+    /// <summary>
+    /// Service collection extensions for registering application services
+    /// </summary>
+    public static class ServiceCollectionExtensions
+    {
+        /// <summary>
+        /// Register all core services (repositories, naming, etc.)
+        /// </summary>
+        public static IServiceCollection AddCoreServices(
+            this IServiceCollection services,
+            string symbolsRoot)
+        {
+            // Register naming strategy
+            services.AddSingleton<IGlyphNaming, DefaultGlyphNaming>();
+
+            // Register file system options
+            services.AddSingleton(new FileSystemOptions(symbolsRoot));
+
+            // Register repository and pack provider
+            services.AddSingleton<IGlyphRepository, FileSystemGlyphRepository>();
+            services.AddSingleton<IFontPackProvider, FileSystemFontPackProvider>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// Register localization services
+        /// </summary>
+        public static IServiceCollection AddLocalization(
+            this IServiceCollection services,
+            string? localesDirectory = null)
+        {
+            services.AddSingleton<ILocalizationService>(sp => 
+                new JsonLocalizationService(localesDirectory));
+
+            return services;
+        }
+
+        /// <summary>
+        /// Register font import services
+        /// </summary>
+        public static IServiceCollection AddFontImport(this IServiceCollection services)
+        {
+            services.AddTransient<FontGlyphRasterizer>();
+            services.AddTransient<FontImportService>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// Register editor-specific services
+        /// </summary>
+        public static IServiceCollection AddEditorServices(
+            this IServiceCollection services,
+            SettingsService settingsService)
+        {
+            services.AddSingleton(settingsService);
+            services.AddSingleton<EditorWorkspaceService>();
+            services.AddTransient<TerminalGlyphCache>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// Register all application services
+        /// </summary>
+        public static IServiceCollection AddApplicationServices(
+            this IServiceCollection services,
+            string symbolsRoot,
+            SettingsService settingsService,
+            string? localesDirectory = null)
+        {
+            return services
+                .AddCoreServices(symbolsRoot)
+                .AddLocalization(localesDirectory)
+                .AddFontImport()
+                .AddEditorServices(settingsService);
+        }
+    }
+}

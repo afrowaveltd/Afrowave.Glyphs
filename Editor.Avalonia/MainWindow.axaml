@@ -1,95 +1,215 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:Editor.Avalonia"
         xmlns:tools="clr-namespace:Tools;assembly=Tools"
         xmlns:controls="clr-namespace:Editor.Avalonia.Controls"
         xmlns:models="clr-namespace:Storage.Abstractions.Models;assembly=Storage.Abstractions"
         x:Class="Editor.Avalonia.MainWindow"
-        Width="1200" Height="700"
+        Width="1400" Height="800"
         Title="Afrowave Glyph Editor"
-        x:DataType="tools:MainViewModel">
+        x:DataType="tools:MainViewModel"
+        Background="{DynamicResource BackgroundBrush}">
 
-  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,*">
+  <Grid RowDefinitions="Auto,*" Margin="0">
+    <!-- Top toolbar -->
+    <Border Grid.Row="0" 
+            Background="{DynamicResource SurfaceBrush}" 
+            BorderBrush="{DynamicResource BorderBrush}" 
+            BorderThickness="0,0,0,1" 
+            Padding="12,8">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
 
-    <!-- Top bar -->
-      <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="10">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-        <Button Content="Open workspace…" Command="{Binding OpenWorkspaceCommand}" />
-        <Button Grid.Column="1" Content="Create Symbols" Command="{Binding CreateSymbolsCommand}" />
-         <Button Grid.Column="2" Content="Import font…" Command="{Binding ImportFontCommand}" />
-
-        <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="Glyph:"/>
-        <ComboBox Grid.Column="4"
-                  Width="110"
-                  ItemsSource="{Binding GlyphSizePresets}"
-                  SelectedItem="{Binding SelectedGlyphSize}" />
-
-        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <TextBlock Text="W:" VerticalAlignment="Center"/>
-          <TextBox Width="44" Text="{Binding CustomGlyphWidth}" />
-          <TextBlock Text="H:" VerticalAlignment="Center"/>
-          <TextBox Width="44" Text="{Binding CustomGlyphHeight}" />
+        <!-- Left buttons -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+          <Button Content="📁" Command="{Binding OpenWorkspaceCommand}" Padding="6,4" ToolTip.Tip="Open Workspace" />
+          <Button Content="📝" Command="{Binding CreateSymbolsCommand}" Padding="6,4" ToolTip.Tip="Create Symbols" />
+          <Button Content="📦" Command="{Binding CreatePackCommand}" Padding="6,4" ToolTip.Tip="New Pack" />
+          <Button Content="🎨" Command="{Binding CreateStyleCommand}" Padding="6,4" ToolTip.Tip="New Style" />
+          <Button Content="📥" Command="{Binding ImportFontCommand}" Padding="6,4" ToolTip.Tip="Import Font" />
+          <Button Content="🔎" Click="OnBrowseGlyphs" Padding="6,4" ToolTip.Tip="Browse Existing Glyphs" />
+          <Button Content="🔢" Click="OnUnicodeRange" Padding="6,4" ToolTip.Tip="Unicode Range" />
         </StackPanel>
 
-        <TextBlock Grid.Column="6" VerticalAlignment="Center" Text="Text:"/>
-        <TextBox Grid.Column="7" Text="{Binding Text}" Watermark="Type preview text..." />
+        <!-- Center controls -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+          <ComboBox Width="80" ItemsSource="{Binding GlyphSizePresets}" SelectedItem="{Binding SelectedGlyphSize}" VerticalAlignment="Center"/>
 
-        <ComboBox Grid.Column="8"
-                  Width="140"
-                  ItemsSource="{Binding PackIds}"
-                  SelectedItem="{Binding SelectedPackId}" />
+          <TextBlock Text="W:" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,0"/>
+          <TextBox Width="45" 
+                   Text="{Binding CustomGlyphWidth}" 
+                   Padding="6,4" 
+                   VerticalAlignment="Center" 
+                   VerticalContentAlignment="Center"
+                   BorderThickness="1"/>
 
-        <ComboBox Grid.Column="9"
-                  Width="160"
-                  ItemsSource="{Binding Styles}"
-                  SelectedItem="{Binding SelectedStyle}">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="models:FontStyleId">
-              <TextBlock Text="{Binding Name}"/>
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
+          <TextBlock Text="H:" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="4,0,0,0"/>
+          <TextBox Width="45" 
+                   Text="{Binding CustomGlyphHeight}" 
+                   Padding="6,4" 
+                   VerticalAlignment="Center" 
+                   VerticalContentAlignment="Center"
+                   BorderThickness="1"/>
 
-        <Button Grid.Column="10" Content="Reload" Command="{Binding ReloadCommand}" />
-      </Grid>
-    </Border>
+          <TextBlock Text="Pack:" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="12,0,0,0"/>
+          <ComboBox Width="80" ItemsSource="{Binding PackIds}" SelectedItem="{Binding SelectedPackId}" VerticalAlignment="Center"/>
 
-    <!-- Left placeholder -->
-    <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto,*">
-      <Border Grid.Row="0" Grid.Column="0" Padding="10">
-       <StackPanel Spacing="6">
-    <StackPanel Orientation="Horizontal" Spacing="6">
-      <TextBlock Text="Selected glyph:" FontWeight="Bold"/>
-      <TextBlock Text="*" IsVisible="{Binding IsGlyphDirty}" />
-    </StackPanel>
-    <TextBlock Text="{Binding SelectedGlyphText}" />
-    <StackPanel Orientation="Horizontal" Spacing="8">
-      <Button Content="Save" Command="{Binding SaveGlyphCommand}" Width="90" IsEnabled="{Binding IsGlyphDirty}" />
-      <Button Content="Revert" Command="{Binding RevertGlyphCommand}" Width="90" />
-      <Button Content="Clear" Command="{Binding ClearGlyphCommand}" Width="90" />
-    </StackPanel>
-           <controls:GlyphPreviewControl x:Name="GlyphPreview"
-                              PackId="{Binding SelectedPackId}"
-                              Style="{Binding SelectedStyle}"
-                              GlyphId="{Binding SelectedGlyph}"
-                              GlyphSize="{Binding GlyphSize}"
-                              PixelScale="16"/>
-         </StackPanel>
-      </Border>
+          <TextBlock Text="Style:" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,0"/>
+          <ComboBox Width="100" ItemsSource="{Binding Styles}" SelectedItem="{Binding SelectedStyle}" VerticalAlignment="Center">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="models:FontStyleId">
+                <TextBlock Text="{Binding Name}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
 
-      <GridSplitter Grid.Column="1" Width="6" Background="#2A2A2A" ResizeDirection="Columns" />
+                <!-- Right buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                  <Button x:Name="ThemeToggle" 
+                          Content="🌙" 
+                          Click="OnToggleTheme" 
+                          Padding="6,4" 
+                          BorderThickness="1"
+                          Background="{DynamicResource SurfaceAltBrush}"
+                          ToolTip.Tip="Toggle Theme" />
+                  <Button Content="🔄" 
+                          Command="{Binding ReloadCommand}" 
+                          Padding="6,4" 
+                          BorderThickness="1"
+                          ToolTip.Tip="Reload Workspace" />
+                </StackPanel>
+              </Grid>
+            </Border>
 
-    <!-- Right terminal -->
-      <Border Grid.Row="0" Grid.Column="2" Padding="10">
-        <local:TerminalPreviewControl x:Name="Terminal"
-                                      Buffer="{Binding PreviewBuffer}"
-                                      PackId="{Binding SelectedPackId}"
-                                      Style="{Binding SelectedStyle}"
-                                      GlyphSize="{Binding GlyphSize}"
-                                      FallbackGlyph="{Binding FallbackGlyph}"
-                                      SelectedGlyph="{Binding SelectedGlyph, Mode=TwoWay}" />
+    <!-- Main content area - Side by side layout -->
+    <Grid Grid.Row="1" ColumnDefinitions="380,4,*" Margin="0">
+
+      <!-- Left panel - Glyph Editor -->
+      <Border Grid.Column="0" 
+              Background="{DynamicResource SurfaceBrush}" 
+              Padding="16">
+        <ScrollViewer>
+          <StackPanel Spacing="12">
+            <TextBlock Text="✏️ Glyph Editor" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+            <!-- Tools -->
+            <Border Background="{DynamicResource SurfaceAltBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="6" 
+                    Padding="10">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Tools (keyboard):" FontSize="12" Opacity="0.7"/>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <Button x:Name="PencilButton" Content="✏️" ToolTip.Tip="Pencil (P)" Click="OnSelectPencil" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                  <Button x:Name="LineButton" Content="📏" ToolTip.Tip="Line (L)" Click="OnSelectLine" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                  <Button x:Name="RectangleButton" Content="▭" ToolTip.Tip="Rectangle (R)" Click="OnSelectRectangle" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                  <Button x:Name="CircleButton" Content="○" ToolTip.Tip="Circle (C)" Click="OnSelectCircle" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                  <Button x:Name="FillButton" Content="🪣" ToolTip.Tip="Fill (F)" Click="OnSelectFill" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                </StackPanel>
+                <Separator Height="1" Margin="0,2" Background="{DynamicResource BorderBrush}"/>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <Button x:Name="UndoButton" Content="↶" ToolTip.Tip="Undo (Ctrl+Z)" Click="OnUndo" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                  <Button x:Name="RedoButton" Content="↷" ToolTip.Tip="Redo (Ctrl+Y)" Click="OnRedo" Padding="8,6" MinWidth="36" BorderThickness="1"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Selected Glyph Info -->
+            <Border Background="{DynamicResource SurfaceAltBrush}" 
+                    BorderBrush="{DynamicResource BorderBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="6" 
+                    Padding="10">
+              <StackPanel Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Selected:" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                  <TextBlock Text="{Binding SelectedGlyphText}" Foreground="{DynamicResource PrimaryBrush}"/>
+                  <TextBlock Text="●" IsVisible="{Binding IsGlyphDirty}" Foreground="{DynamicResource WarningBrush}" FontSize="10" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <UniformGrid Columns="2" Rows="2" HorizontalAlignment="Stretch">
+                  <Button Content="💾 Save" 
+                          Command="{Binding SaveGlyphCommand}" 
+                          IsEnabled="{Binding IsGlyphDirty}" 
+                          Margin="2" 
+                          Padding="8,6" 
+                          BorderThickness="1"/>
+                  <Button Content="↩️ Revert" 
+                          Command="{Binding RevertGlyphCommand}" 
+                          Margin="2" 
+                          Padding="8,6" 
+                          BorderThickness="1"/>
+                  <Button Content="🗑️ Clear" 
+                          Command="{Binding ClearGlyphCommand}" 
+                          Margin="2" 
+                          Padding="8,6" 
+                          BorderThickness="1"/>
+                  <Button Content="📋 Clone" 
+                          Click="OnCloneGlyph" 
+                          Margin="2" 
+                          Padding="8,6" 
+                          BorderThickness="1"/>
+                </UniformGrid>
+              </StackPanel>
+            </Border>
+
+                  <!-- Glyph Preview Canvas -->
+                  <Border Background="{DynamicResource SurfaceAltBrush}" 
+                          BorderBrush="{DynamicResource BorderBrush}" 
+                          BorderThickness="1" 
+                          CornerRadius="6" 
+                          Padding="12" 
+                          HorizontalAlignment="Center">
+                    <controls:GlyphPreviewControl x:Name="GlyphPreview" 
+                                                 PackId="{Binding SelectedPackId}" 
+                                                 Style="{Binding SelectedStyle}" 
+                                                 GlyphId="{Binding SelectedGlyph}" 
+                                                 GlyphSize="{Binding GlyphSize}" 
+                                                 PixelScale="20"/>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+
+            <!-- Vertical separator -->
+            <Border Grid.Column="1" Background="{DynamicResource BorderBrush}" Width="4"/>
+
+            <!-- Right panel - Preview -->
+            <Border Grid.Column="2" Background="{DynamicResource BackgroundBrush}" Padding="16">
+              <Grid RowDefinitions="Auto,*">
+                <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
+                  <TextBlock Text="📺 Preview" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                  <TextBox Text="{Binding Text}" 
+                           Watermark="Type preview text here... (supports \uXXXX, {U+XXXX}, {current})" 
+                           AcceptsReturn="True" 
+                           AcceptsTab="True"
+                           TextWrapping="Wrap"
+                           MinHeight="60"
+                           MaxHeight="120"
+                           Padding="8" 
+                           BorderThickness="1"/>
+                </StackPanel>
+
+                <Border Grid.Row="1" 
+                        Background="{DynamicResource SurfaceBrush}" 
+                        CornerRadius="6" 
+                        BorderBrush="{DynamicResource BorderBrush}" 
+                        BorderThickness="1"
+                  Padding="12">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+              <local:TerminalPreviewControl x:Name="Terminal" 
+                                           Buffer="{Binding PreviewBuffer}" 
+                                           PackId="{Binding SelectedPackId}" 
+                                           Style="{Binding SelectedStyle}" 
+                                           GlyphSize="{Binding GlyphSize}" 
+                                           FallbackGlyph="{Binding FallbackGlyph}" 
+                                           SelectedGlyph="{Binding SelectedGlyph, Mode=TwoWay}" />
+            </ScrollViewer>
+          </Border>
+        </Grid>
       </Border>
     </Grid>
-
   </Grid>
 </Window>

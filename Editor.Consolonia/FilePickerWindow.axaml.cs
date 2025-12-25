@@ -1,15 +1,15 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Iciclecreek.Avalonia.WindowManager;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Tools;
 
 namespace Editor.Consolonia;
 
-public partial class FilePickerWindow : ManagedWindow
+public partial class FilePickerWindow : Window
 {
    private TaskCompletionSource<string?>? _tcs;
 
@@ -20,7 +20,7 @@ public partial class FilePickerWindow : ManagedWindow
 
    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
-   public Task<string?> PickAsync(Window owner, string title, string startDirectory, string filterText)
+   public Task<string?> PickAsync(Window owner, string title, string startDirectory, string filterText, bool allowFolderSelection = false)
    {
       Title = title;
       var vm = new FilePickerViewModel(startDirectory)
@@ -30,12 +30,15 @@ public partial class FilePickerWindow : ManagedWindow
 
       DataContext = vm;
       _tcs = new TaskCompletionSource<string?>();
+      _allowFolderSelection = allowFolderSelection;
 
       Closed += (_, _) => _tcs.TrySetResult(null);
 
       Show(owner);
       return _tcs.Task;
    }
+
+   private bool _allowFolderSelection;
 
    private void OnOpen(object? sender, RoutedEventArgs e)
    {
@@ -58,12 +61,43 @@ public partial class FilePickerWindow : ManagedWindow
       if(DataContext is not FilePickerViewModel vm)
          return;
 
+      // If folder selection is allowed and no item is selected (or ".." is selected),
+      // we might want to return the current directory.
+      // However, usually users select a folder in the list.
+      
       var selected = vm.GetSelectedFullPath();
-      if(string.IsNullOrWhiteSpace(selected) || !File.Exists(selected))
+      
+      // Fallback: if nothing selected, and we are in folder mode, return current directory
+      if (string.IsNullOrWhiteSpace(selected) && _allowFolderSelection)
+      {
+          _tcs?.TrySetResult(vm.CurrentDirectory);
+          Close();
+          return;
+      }
+
+      if(string.IsNullOrWhiteSpace(selected))
          return;
 
-      _tcs?.TrySetResult(selected);
-      Close();
+      if (_allowFolderSelection)
+      {
+          if (Directory.Exists(selected))
+          {
+              _tcs?.TrySetResult(selected);
+              Close();
+              return;
+          }
+          // If they selected a file but we want a folder, maybe return the parent? 
+          // Or just ignore. For now, let's assume they must select a directory.
+      }
+      else
+      {
+          if (File.Exists(selected))
+          {
+              _tcs?.TrySetResult(selected);
+              Close();
+              return;
+          }
+      }
    }
 
    private void OnCancel(object? sender, RoutedEventArgs e)
@@ -77,7 +111,10 @@ public partial class FilePickerWindow : ManagedWindow
       try
       {
          if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+         {
+            // Windows 11+ user fonts
+            return AppPaths.GetSystemFontsDirectory();
+         }
 
          if(RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             return "/System/Library/Fonts";

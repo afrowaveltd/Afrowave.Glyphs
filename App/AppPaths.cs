@@ -47,6 +47,30 @@ namespace Tools
          return Path.Combine(Path.GetTempPath(), VendorFolder, AppFolder);
       }
 
+      public static string GetSystemFontsDirectory()
+      {
+         // Try user-installed fonts first (Windows 11+)
+         var userFonts = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft", "Windows", "Fonts"
+         );
+
+         if(Directory.Exists(userFonts))
+            return userFonts;
+
+         // Fallback to system fonts
+         var systemFonts = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "Fonts"
+         );
+
+         if(Directory.Exists(systemFonts))
+            return systemFonts;
+
+         // Last fallback - Documents
+         return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+      }
+
       public static void EnsureFolders()
       {
          Directory.CreateDirectory(UserHomeAfrowave());

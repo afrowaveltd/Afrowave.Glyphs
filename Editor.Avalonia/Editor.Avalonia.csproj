@@ -5,8 +5,11 @@
     <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-  </PropertyGroup>
+      <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+      <!-- Application Icon -->
+      <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.10" />
@@ -22,10 +25,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\App\Tools.csproj" />
-    <ProjectReference Include="..\Core\Core.csproj" />
-    <ProjectReference Include="..\Runtime\Runtime.csproj" />
-    <ProjectReference Include="..\Storage.Abstractions\Storage.Abstractions.csproj" />
-    <ProjectReference Include="..\Storage.FileSystem\Storage.FileSystem.csproj" />
-  </ItemGroup>
-</Project>
+        <ProjectReference Include="..\App\Tools.csproj" />
+        <ProjectReference Include="..\Core\Core.csproj" />
+        <ProjectReference Include="..\Runtime\Runtime.csproj" />
+        <ProjectReference Include="..\Storage.Abstractions\Storage.Abstractions.csproj" />
+              <ProjectReference Include="..\Storage.FileSystem\Storage.FileSystem.csproj" />
+            </ItemGroup>
+
+            <!-- Avalonia Assets -->
+            <ItemGroup>
+              <AvaloniaResource Include="Assets\icon.png" />
+            </ItemGroup>
+        </Project>

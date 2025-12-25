@@ -1,0 +1,80 @@
+// Příklad použití DI v App.axaml.cs
+
+using Microsoft.Extensions.DependencyInjection;
+using Tools.DependencyInjection;
+
+// V OnFrameworkInitializationCompleted:
+
+private IServiceProvider? _services;
+
+public override void OnFrameworkInitializationCompleted()
+{
+    // 1) Setup DI Container
+    var services = new ServiceCollection();
+    
+    // 2) Load settings first
+    var store = new JsonAppSettingsStore();
+    var settingsService = new SettingsService(store);
+    await settingsService.InitializeAsync();
+    
+    var settings = settingsService.Current;
+    string workspaceRoot = settings.GetActiveSymbolsRoot();
+    string symbolsRoot = SymbolsFolderResolver.ResolveSymbolsRoot(workspaceRoot, createIfMissing: true);
+    
+    // 3) Register all services
+    services.AddApplicationServices(
+        symbolsRoot,
+        settingsService,
+        localesDirectory: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Locales")
+    );
+    
+    // 4) Build service provider
+    _services = services.BuildServiceProvider();
+    
+    // 5) Get services from DI
+    var repo = _services.GetRequiredService<IGlyphRepository>();
+    var packs = _services.GetRequiredService<IFontPackProvider>();
+    var localization = _services.GetRequiredService<ILocalizationService>();
+    var workspaceService = _services.GetRequiredService<EditorWorkspaceService>();
+    var cache = _services.GetRequiredService<TerminalGlyphCache>();
+    
+    // 6) Create ViewModel with dependencies
+    var vm = new MainViewModel(packs, repo, localization);
+    
+    // ... rest of initialization
+}
+
+// Příklad použití lokalizace v MainViewModel:
+
+public class MainViewModel : ViewModelBase
+{
+    private readonly ILocalizationService _loc;
+    
+    public MainViewModel(
+        IFontPackProvider packs, 
+        IGlyphRepository repo,
+        ILocalizationService localization)
+    {
+        _packs = packs;
+        _repo = repo;
+        _loc = localization;
+    }
+    
+    // Použití:
+    public string SaveButtonText => _loc["button.save"];
+    public string RevertButtonText => _loc["button.revert"];
+    
+    // Nebo s fallbackem:
+    public string CustomText => _loc.Get("custom.key", "Default text");
+}
+
+// Příklad změny jazyka:
+
+private void OnLanguageChanged(string languageCode)
+{
+    var localization = _services.GetRequiredService<ILocalizationService>();
+    localization.SetLanguage(languageCode); // "cs", "en-US", atd.
+    
+    // Notify all ViewModels to refresh their localized strings
+    // (můžete použít event nebo messenger pattern)
+}
