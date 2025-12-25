@@ -31,6 +31,13 @@ namespace Storage.FileSystem
             var packId = Path.GetFileName(dir);
 
             // BOS-first: packId like "8x16" / "16x16"
+            // IMPORTANT: Ignore folders that start with underscore (these are styles, not packs!)
+            if(packId.StartsWith("_"))
+            {
+               System.Diagnostics.Debug.WriteLine($"[PACK PROVIDER] Ignoring style folder: {packId}");
+               continue;
+            }
+
             if(TryParseGridSize(packId, out GridSize size))
                list.Add(new FontPackDescriptor(packId, packId, size));
             else

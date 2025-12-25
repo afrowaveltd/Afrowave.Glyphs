@@ -34,7 +34,9 @@ public partial class FilePickerWindow : Window
 
       Closed += (_, _) => _tcs.TrySetResult(null);
 
-      Show(owner);
+      // Consolonia: Show as non-modal window (can't use ShowDialog from another window)
+      Show();
+
       return _tcs.Task;
    }
 

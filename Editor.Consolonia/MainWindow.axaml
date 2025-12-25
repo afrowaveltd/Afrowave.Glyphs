@@ -21,18 +21,20 @@
       <Button Content="Exit" Click="OnExit" />
     </StackPanel>
 
-    <!-- Pack, Style, Size -->
-    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,*,Auto,*" Margin="0,0,0,1">
+    <!-- Pack, Style, Size, Custom W/H -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,12,Auto,12,Auto,12,Auto,5,Auto,5,Auto,5,Auto,5,*" Margin="0,0,0,1">
       <TextBlock Text="Pack:" VerticalAlignment="Center" Grid.Column="0" Margin="1,0"/>
       <ComboBox ItemsSource="{Binding PackIds}" 
                 SelectedItem="{Binding SelectedPackId}" 
-                Width="10" 
+                MinWidth="10"
+                MaxWidth="15"
                 Grid.Column="1" />
 
       <TextBlock Text="Style:" VerticalAlignment="Center" Grid.Column="2" Margin="1,0"/>
       <ComboBox ItemsSource="{Binding Styles}" 
                 SelectedItem="{Binding SelectedStyle}" 
-                Width="10" 
+                MinWidth="10"
+                MaxWidth="15"
                 Grid.Column="3">
         <ComboBox.ItemTemplate>
           <DataTemplate>
@@ -42,7 +44,28 @@
       </ComboBox>
 
       <TextBlock Text="Size:" VerticalAlignment="Center" Grid.Column="4" Margin="1,0"/>
-      <TextBlock Text="{Binding SelectedGlyphSize}" VerticalAlignment="Center" Grid.Column="5" />
+      <TextBlock Text="{Binding SelectedGlyphSize}" VerticalAlignment="Center" Grid.Column="5" MinWidth="6" />
+
+      <TextBlock Text="W:" VerticalAlignment="Center" Grid.Column="6" Margin="1,0"/>
+      <TextBox Text="{Binding CustomGlyphWidth}" 
+               Width="5" 
+               Grid.Column="7"
+               VerticalAlignment="Center" 
+               HorizontalContentAlignment="Center"/>
+
+      <TextBlock Text="H:" VerticalAlignment="Center" Grid.Column="8" Margin="1,0"/>
+      <TextBox Text="{Binding CustomGlyphHeight}" 
+               Width="5" 
+               Grid.Column="9"
+               VerticalAlignment="Center" 
+               HorizontalContentAlignment="Center"/>
+
+      <TextBlock Text="[auto]" 
+                 VerticalAlignment="Center" 
+                 Grid.Column="10"
+                 Foreground="Gray" 
+                 FontSize="10"
+                 Margin="2,0,0,0"/>
     </Grid>
 
     <!-- Main content -->
@@ -53,7 +76,17 @@
           <TextBlock Text="Editor" FontWeight="Bold" />
           <TextBlock Text="{Binding SelectedGlyphText}" Foreground="Cyan"/>
 
-          <StackPanel Spacing="1" Margin="0,5,0,0">
+          <!-- Glyph selector -->
+          <TextBlock Text="Select glyph:" Margin="0,2,0,0"/>
+          <StackPanel Orientation="Horizontal" Spacing="1">
+            <TextBox Name="GlyphIdInput" 
+                     Width="10" 
+                     Watermark="U+0041"
+                     ToolTip.Tip="Enter char, U+hex, or name"/>
+            <Button Content="Go" Click="OnSetGlyphId" Width="4" />
+          </StackPanel>
+
+          <StackPanel Spacing="1" Margin="0,3,0,0">
             <Button Content="Save" Command="{Binding SaveGlyphCommand}" IsEnabled="{Binding IsGlyphDirty}" />
             <Button Content="Revert" Command="{Binding RevertGlyphCommand}" />
             <Button Content="Clear" Command="{Binding ClearGlyphCommand}" />
@@ -71,9 +104,40 @@
         </StackPanel>
 
         <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="1">
-          <TextBlock Text="Preview will appear here" 
-                     HorizontalAlignment="Center" 
-                     VerticalAlignment="Center"/>
+          <Grid RowDefinitions="Auto,*">
+            <!-- Info text -->
+            <TextBlock Grid.Row="0" 
+                       Text="Preview (limited to 5 chars, ASCII art pixels)"
+                       Foreground="Gray"
+                       FontSize="10"
+                       Margin="2,2,2,1"/>
+
+            <!-- ASCII art preview -->
+            <ScrollViewer Grid.Row="1">
+              <StackPanel Spacing="1" Margin="2">
+                <TextBlock Name="PreviewAscii"
+                           FontFamily="Consolas,Courier New,monospace"
+                           Foreground="Cyan"
+                           Background="Black"
+                           FontSize="8"
+                           LineHeight="8"
+                           Padding="1" />
+
+                <TextBlock Text="Text input above (limited preview):"
+                           Foreground="Gray"
+                           FontSize="10"
+                           Margin="0,4,0,1"/>
+
+                <TextBlock Name="PreviewText"
+                           Text="{Binding Text}"
+                           FontFamily="Consolas,Courier New,monospace"
+                           Foreground="White"
+                           Background="Black"
+                           Padding="2"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
         </Border>
       </Grid>
     </Grid>

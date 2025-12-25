@@ -3,7 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Core.Naming;
-using Editor.Avalonia.Services;
+using Tools.Services;
 using Storage.Abstractions.Abstractions;
 using Storage.Abstractions.Models;
 using Storage.FileSystem;
@@ -93,13 +93,26 @@ public partial class App : Application
                // Load packs + styles + render
                await vm.ReloadAsync();
 
+               System.Diagnostics.Debug.WriteLine($"[APP INIT] After ReloadAsync: PackIds.Count = {vm.PackIds.Count}");
+               foreach(var p in vm.PackIds)
+                  System.Diagnostics.Debug.WriteLine($"[APP INIT] PackId: {p}");
+
                // NOW set SelectedPackId AFTER PackIds is populated
                if(vm.PackIds.Contains(packId))
+               {
+                  System.Diagnostics.Debug.WriteLine($"[APP INIT] Setting SelectedPackId to {packId} (found in collection)");
                   vm.SelectedPackId = packId;
+               }
                else if(vm.PackIds.Count > 0)
+               {
+                  System.Diagnostics.Debug.WriteLine($"[APP INIT] Setting SelectedPackId to {vm.PackIds[0]} (first in collection)");
                   vm.SelectedPackId = vm.PackIds[0];
+               }
                else
+               {
+                  System.Diagnostics.Debug.WriteLine($"[APP INIT] No packs found! Setting fallback to {packId}");
                   vm.SelectedPackId = packId; // Fallback even if empty
+               }
 
                // Set SelectedStyle AFTER Reload (so Styles collection is populated)
                var lastStyle = settings.LastStyle;

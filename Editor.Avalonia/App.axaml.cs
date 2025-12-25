@@ -6,7 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Core.Naming;
-using Editor.Avalonia.Services;
+using Tools.Services;
 using Storage.Abstractions.Abstractions;
 using Storage.Abstractions.Models;
 using Storage.FileSystem;

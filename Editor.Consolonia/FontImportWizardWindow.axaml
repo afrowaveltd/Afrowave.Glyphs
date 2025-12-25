@@ -7,11 +7,17 @@
         Title="Import font">
 
   <StackPanel Spacing="1">
-    <TextBlock Text="Font:"/>
-    <StackPanel Orientation="Horizontal" Spacing="1">
-      <TextBox Text="{Binding FontPath}" Watermark="path to .ttf/.otf" Width="80" />
-      <Button Content="Browse" Command="{Binding PickFontCommand}" />
-    </StackPanel>
+    <TextBlock Text="Font file path (.ttf or .otf):"/>
+    <TextBox Name="FontPathInput" 
+             Text="{Binding FontPath}" 
+             Watermark="e.g., C:\Windows\Fonts\arial.ttf" 
+             Width="90" />
+
+    <TextBlock Text="Common paths: Windows: C:\Windows\Fonts\  Linux: /usr/share/fonts/truetype/  macOS: /System/Library/Fonts/"
+               Foreground="Gray"
+               FontSize="9"
+               TextWrapping="Wrap"
+               Margin="0,0,0,1"/>
 
     <TextBlock Text="Pack (e.g. 8x16):"/>
     <TextBox Text="{Binding PackId}" />

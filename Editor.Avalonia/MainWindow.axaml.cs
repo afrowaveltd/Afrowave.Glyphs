@@ -9,7 +9,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Core.Models;
 using Core.Naming;
-using Editor.Avalonia.Services;
+using Tools.Services;
 using Storage.Abstractions.Abstractions;
 using Storage.Abstractions.Models;
 using Storage.FileSystem;
@@ -389,11 +389,14 @@ public partial class MainWindow : Window
 
       var old = DataContext as MainViewModel;
 
+      // Save old values
+      var oldText = old?.Text ?? string.Empty;
+      var oldPackId = old?.SelectedPackId ?? "8x16";
+      var oldStyle = old?.SelectedStyle ?? new FontStyleId("_base_");
+
       var vm = new MainViewModel(packs, repo)
       {
-         Text = old?.Text ?? string.Empty,
-         SelectedPackId = old?.SelectedPackId ?? "8x16",
-         SelectedStyle = old?.SelectedStyle ?? new FontStyleId("_base_")
+         Text = oldText
       };
 
       vm.OpenWorkspaceHandler = OpenWorkspaceAsync;
@@ -411,7 +414,20 @@ public partial class MainWindow : Window
       {
          DataContext = vm;
          SetTerminalCache(cache);
+
+         // Load packs and styles FIRST
          await vm.ReloadAsync().ConfigureAwait(false);
+
+         // THEN set selected values
+         if(vm.PackIds.Contains(oldPackId))
+            vm.SelectedPackId = oldPackId;
+         else if(vm.PackIds.Count > 0)
+            vm.SelectedPackId = vm.PackIds[0];
+
+         if(vm.Styles.Contains(oldStyle))
+            vm.SelectedStyle = oldStyle;
+         else if(vm.Styles.Count > 0)
+            vm.SelectedStyle = vm.Styles[0];
       });
    }
 

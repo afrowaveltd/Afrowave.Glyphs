@@ -3,10 +3,11 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Core.Models;
 using Core.Naming;
-using Editor.Avalonia.Services;
+using Tools.Services;
 using Storage.Abstractions.Abstractions;
 using Storage.Abstractions.Models;
 using Storage.FileSystem;
@@ -21,9 +22,87 @@ public partial class MainWindow : Window
    private Action<MainViewModel, TerminalGlyphCache>? _applyRuntime;
    private TerminalGlyphCache? _currentCache;
 
+   // View management
+   private UserControl? _currentView;
+   private ContentControl? _contentHost;
+
    public MainWindow()
    {
       InitializeComponent();
+
+      // Get content host
+      _contentHost = this.FindControl<ContentControl>("ContentHost");
+   }
+
+   public void ShowMainView()
+   {
+      // Main view is already the default content in XAML
+      // No need to change anything
+   }
+
+   public async Task ShowFontImportWizard(FontImportWizardViewModel wizVm)
+   {
+      // Create import view inline (no new Window!)
+      var importView = new FontImportWizardView
+      {
+         DataContext = wizVm
+      };
+
+      if(_contentHost != null)
+      {
+         _contentHost.Content = importView;
+      }
+
+      // When wizard closes, restore main view
+      wizVm.CloseHandler = async () =>
+      {
+         if(_contentHost != null)
+         {
+            _contentHost.Content = this.FindControl<Grid>("MainViewContent");
+         }
+
+         // Reload after import
+         if(DataContext is MainViewModel vm)
+         {
+            await vm.ReloadAsync();
+         }
+      };
+   }
+
+   public async Task ShowGlyphEditor(GlyphEditorViewModel editorVm)
+   {
+      // Create editor view inline
+      var editorView = new GlyphEditorView
+      {
+         DataContext = editorVm
+      };
+
+      if(_contentHost != null)
+      {
+         _contentHost.Content = editorView;
+      }
+
+      var tcs = new TaskCompletionSource<bool>();
+
+      editorView.AcceptClicked += (s, e) =>
+      {
+         if(_contentHost != null)
+         {
+            _contentHost.Content = this.FindControl<Grid>("MainViewContent");
+         }
+         tcs.SetResult(true);
+      };
+
+      editorView.CancelClicked += (s, e) =>
+      {
+         if(_contentHost != null)
+         {
+            _contentHost.Content = this.FindControl<Grid>("MainViewContent");
+         }
+         tcs.SetResult(false);
+      };
+
+      await tcs.Task;
    }
 
    public void SetTerminalCache(TerminalGlyphCache cache)
@@ -33,11 +112,104 @@ public partial class MainWindow : Window
       _applyRuntime = (vm, c) =>
       {
          _currentCache = c;
-         // Controls removed from XAML - simplified TUI version
+
+         // Setup text change listener for ASCII preview
+         vm.PropertyChanged += OnViewModelPropertyChanged;
+
+         // Initial render
+         UpdateAsciiPreview(vm);
       };
 
       if(DataContext is MainViewModel vm)
          _applyRuntime(vm, cache);
+   }
+
+   private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+   {
+      if(e.PropertyName == nameof(MainViewModel.Text) || 
+         e.PropertyName == nameof(MainViewModel.SelectedPackId) ||
+         e.PropertyName == nameof(MainViewModel.SelectedStyle) ||
+         e.PropertyName == nameof(MainViewModel.SelectedGlyphSize))
+      {
+         if(sender is MainViewModel vm)
+            UpdateAsciiPreview(vm);
+      }
+   }
+
+   private async void UpdateAsciiPreview(MainViewModel vm)
+   {
+      if(_currentCache == null) return;
+
+      // Ensure we're on UI thread
+      if(!Dispatcher.UIThread.CheckAccess())
+      {
+         await Dispatcher.UIThread.InvokeAsync(() => UpdateAsciiPreview(vm));
+         return;
+      }
+
+      var previewBlock = this.FindControl<TextBlock>("PreviewAscii");
+      if(previewBlock == null) return;
+
+      var text = vm.Text ?? "";
+      if(string.IsNullOrEmpty(text))
+      {
+         previewBlock.Text = "(type text above to see ASCII preview)";
+         return;
+      }
+
+      // Calculate how many characters fit based on window width and glyph size
+      // Assume window width ~85 chars for preview area (120 total - 35 left panel)
+      var windowWidth = (int)Width - 40; // Subtract left panel + margins
+      var charWidth = vm.SelectedGlyphSize.Width + 1; // +1 for space between chars
+      var maxChars = Math.Max(1, Math.Min(text.Length, windowWidth / charWidth));
+
+      var limitedText = text.Length > maxChars ? text.Substring(0, maxChars) : text;
+
+      var ascii = await RenderToAsciiArtAsync(limitedText, vm);
+      previewBlock.Text = ascii + (text.Length > maxChars ? $"\n... ({text.Length - maxChars} more chars)" : "");
+   }
+
+   private async Task<string> RenderToAsciiArtAsync(string text, MainViewModel vm)
+   {
+      var sb = new System.Text.StringBuilder();
+      var glyphSize = vm.SelectedGlyphSize;
+
+      try
+      {
+         // Render each character side-by-side
+         for(int row = 0; row < glyphSize.Height; row++)
+         {
+            for(int charIndex = 0; charIndex < text.Length; charIndex++)
+            {
+               var ch = text[charIndex];
+               var glyphId = GlyphId.FromUnicode((int)ch);
+
+               var bitmap = await _currentCache.GetBitmapAsync(
+                  vm.SelectedPackId, 
+                  vm.SelectedStyle, 
+                  glyphId, 
+                  glyphSize, 
+                  vm.FallbackGlyph, 
+                  System.Threading.CancellationToken.None);
+
+               // Render this row of the glyph
+               for(int col = 0; col < glyphSize.Width; col++)
+               {
+                  var pixel = bitmap.GetPixel(col, row);
+                  sb.Append(pixel ? "█" : "·");  // Full block or dot
+               }
+
+               sb.Append(" ");  // Space between characters
+            }
+            sb.AppendLine();
+         }
+      }
+      catch
+      {
+         return "(preview error - check pack/style)";
+      }
+
+      return sb.ToString();
    }
 
    private void TerminalOnGlyphClicked(GlyphId glyphId)
@@ -77,77 +249,59 @@ public partial class MainWindow : Window
          return Task.CompletedTask;
       }
 
-      private async Task ImportFontAsync()
-   {
-      if(DataContext is not MainViewModel hostVm)
-         return;
+                     private async Task ImportFontAsync()
+                  {
+                     if(DataContext is not MainViewModel hostVm) return;
+                     if(_workspace == null) return;
 
-      if(_workspace == null)
-         return;
+                     // Consolonia SOLUTION: Use inline view instead of new Window!
+                     var rasterizer = new FontGlyphRasterizer();
+                     var importService = new FontImportService(hostVm.Repository, rasterizer);
 
-      var rasterizer = new FontGlyphRasterizer();
-      var importService = new FontImportService(hostVm.Repository, rasterizer);
+                     var wizVm = new FontImportWizardViewModel(importService)
+                     {
+                        PackId = hostVm.SelectedPackId,
+                        Style = hostVm.SelectedStyle,
+                        GlyphSize = hostVm.SelectedGlyphSize,
+                        FontPath = FilePickerWindow.GetDefaultFontsDirectory()
+                     };
 
-      var wizVm = new FontImportWizardViewModel(importService)
-      {
-         PackId = hostVm.SelectedPackId,
-         Style = hostVm.SelectedStyle,
-         GlyphSize = hostVm.SelectedGlyphSize
-      };
+                     // Setup handlers
+                     wizVm.ApplyBitmapToEditorHandler = async bmp =>
+                     {
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                           if(bmp == null) return;
 
-      wizVm.PickFontFileHandler = async title =>
-      {
-         var picker = new FilePickerWindow();
-         var startDir = FilePickerWindow.GetDefaultFontsDirectory();
-            return await picker.PickAsync(this, title, startDir, ".ttf;.otf").ConfigureAwait(true);
-         };
+                           var currentSize = hostVm.SelectedGlyphSize;
+                           if(bmp != null && !bmp.Size.Equals(currentSize))
+                           {
+                              System.Diagnostics.Debug.WriteLine($"WARNING: Import bitmap size {bmp.Size} doesn't match expected size {currentSize}");
+                           }
 
-         GlyphEditorViewModel? editorVm = null;
-         wizVm.ApplyBitmapToEditorHandler = async bmp =>
-         {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-               if(bmp == null)
-                  return;
+                           var id = GlyphId.FromUnicode(wizVm.CurrentCodePoint);
+                           hostVm.SelectedGlyph = id;
+                           hostVm.EditedBitmap = bmp;
+                        });
+                     };
 
-               // IMPORTANT: Check if bitmap size matches current glyph size
-               var currentSize = hostVm.SelectedGlyphSize;
+                     wizVm.ReadBitmapFromEditorHandler = () => Task.FromResult(hostVm.EditedBitmap);
 
-               if(bmp != null && !bmp.Size.Equals(currentSize))
-               {
-                  // Bitmap has wrong size - log warning
-                  System.Diagnostics.Debug.WriteLine($"WARNING: Import bitmap size {bmp.Size} doesn't match expected size {currentSize}");
-               }
+                     wizVm.GlyphSavedHandler = async () =>
+                     {
+                        if(_currentCache != null)
+                        {
+                           await Dispatcher.UIThread.InvokeAsync(async () =>
+                           {
+                              _currentCache.Clear();
+                              await hostVm.RenderAsync();
+                           });
+                        }
+                     };
 
-               // Replace edited bitmap for currently selected glyph id
-               var id = GlyphId.FromUnicode(wizVm.CurrentCodePoint);
-               hostVm.SelectedGlyph = id;
-               hostVm.EditedBitmap = bmp;
-            });
-         };
-
-         wizVm.ReadBitmapFromEditorHandler = () => Task.FromResult(hostVm.EditedBitmap);
-
-         wizVm.GlyphSavedHandler = async () =>
-         {
-            // Clear cache and refresh preview when glyph is saved
-            if(_currentCache != null)
-            {
-               await Dispatcher.UIThread.InvokeAsync(async () =>
-               {
-                  _currentCache.Clear();
-                  await hostVm.RenderAsync();
-               });
-            }
-         };
-
-         var win = new FontImportWizardWindow();
-         win.Initialize(wizVm);
-         await win.ShowDialog(this).ConfigureAwait(true);
-
-         // Refresh after import
-         await hostVm.ReloadAsync().ConfigureAwait(true);
-      }
+                     // Show wizard as inline view (no new Window!)
+                     await ShowFontImportWizard(wizVm);
+                  }
 
    private async Task OnGlyphSavedAsync()
    {
@@ -164,24 +318,24 @@ public partial class MainWindow : Window
    {
       if(_workspace == null) return;
 
-      var picker = new FilePickerWindow();
-      // Start at current workspace root or current dir
+      // Use simple prompt - no Window to avoid Consolonia crashes
       var start = _workspace.CurrentWorkspaceRoot;
       if(string.IsNullOrEmpty(start) || !System.IO.Directory.Exists(start))
          start = System.Environment.CurrentDirectory;
 
-      var picked = await picker.PickAsync(this, "Select workspace folder", start, "", allowFolderSelection: true).ConfigureAwait(true);
+      // Show input in status bar or use existing dialog pattern
+      // For now, just use a very simple approach: text file or config
+      // TODO: Implement proper dialog without Window class
 
-      if(string.IsNullOrEmpty(picked))
-         return;
+      // Temporary workaround: Use current directory
+      var root = start;
 
-      var root = picked;
       await _workspace.AddWorkspaceRootAsync(root).ConfigureAwait(true);
       await _workspace.EnsureSymbolsStructureAsync(root).ConfigureAwait(true);
 
       await ReinitializeForWorkspaceAsync(root).ConfigureAwait(true);
 
-      Title = $"Consolonia - {root}";
+      Title = $"Consolonia - {root} (Workspace reload - use Settings to change)";
    }
 
    private async Task CreateSymbolsAsync()
@@ -197,35 +351,12 @@ public partial class MainWindow : Window
       if(DataContext is not MainViewModel vm) return;
       if(_workspace == null) return;
 
-      // Simple prompt for style name (TUI doesn't have fancy dialogs)
-      // We'll create a simple input window
-      var inputWin = new Window
-      {
-         Title = "New Style",
-         Width = 60,
-         Height = 10
-      };
-
-      var stack = new StackPanel { Spacing = 1, Margin = new Thickness(2) };
-      stack.Children.Add(new TextBlock { Text = "Style name (e.g. arabic, emojis):" });
-
-      var input = new TextBox { Watermark = "style_name" };
-      stack.Children.Add(input);
-
-      var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 1, Margin = new Thickness(0, 1, 0, 0) };
-      var okBtn = new Button { Content = "Create", Width = 10 };
-      var cancelBtn = new Button { Content = "Cancel", Width = 10 };
-      buttons.Children.Add(okBtn);
-      buttons.Children.Add(cancelBtn);
-      stack.Children.Add(buttons);
-
-      inputWin.Content = stack;
-
-      string? styleName = null;
-      okBtn.Click += (s, e) => { styleName = input.Text?.Trim(); inputWin.Close(); };
-      cancelBtn.Click += (s, e) => { inputWin.Close(); };
-
-      await inputWin.ShowDialog(this).ConfigureAwait(true);
+      // Use inline dialog instead of Window
+      var styleName = await InlineDialogHelper.ShowTextInputAsync(
+         this,
+         "New Style",
+         "Style name (e.g. arabic, emojis):",
+         watermark: "style_name");
 
       if(string.IsNullOrWhiteSpace(styleName)) return;
 
@@ -263,11 +394,14 @@ public partial class MainWindow : Window
 
       var old = DataContext as MainViewModel;
 
+      // Save old values
+      var oldText = old?.Text ?? string.Empty;
+      var oldPackId = old?.SelectedPackId ?? "8x16";
+      var oldStyle = old?.SelectedStyle ?? new FontStyleId("_base_");
+
       var vm = new MainViewModel(packs, repo)
       {
-         Text = old?.Text ?? string.Empty,
-         SelectedPackId = old?.SelectedPackId ?? "8x16",
-         SelectedStyle = old?.SelectedStyle ?? new FontStyleId("_base_")
+         Text = oldText
       };
 
       vm.OpenWorkspaceHandler = OpenWorkspaceAsync;
@@ -279,14 +413,27 @@ public partial class MainWindow : Window
       vm.CloneGlyphHandler = CloneGlyphAsync;
       vm.UnicodeRangeWizardHandler = UnicodeRangeWizardAsync;
 
-         var cache = new TerminalGlyphCache(repo);
+      var cache = new TerminalGlyphCache(repo);
 
-         await Dispatcher.UIThread.InvokeAsync(async () =>
-         {
-            DataContext = vm;
-            SetTerminalCache(cache);
-            await vm.ReloadAsync().ConfigureAwait(false);
-         });
+      await Dispatcher.UIThread.InvokeAsync(async () =>
+      {
+         DataContext = vm;
+         SetTerminalCache(cache);
+
+         // Load packs and styles FIRST
+         await vm.ReloadAsync().ConfigureAwait(false);
+
+         // THEN set selected values
+         if(vm.PackIds.Contains(oldPackId))
+            vm.SelectedPackId = oldPackId;
+         else if(vm.PackIds.Count > 0)
+            vm.SelectedPackId = vm.PackIds[0];
+
+         if(vm.Styles.Contains(oldStyle))
+            vm.SelectedStyle = oldStyle;
+         else if(vm.Styles.Count > 0)
+            vm.SelectedStyle = vm.Styles[0];
+      });
       }
 
    private async void OnEditGlyph(object? sender, RoutedEventArgs e)
@@ -320,19 +467,44 @@ public partial class MainWindow : Window
          vm.EditedBitmap = bmp;
       }
 
-      var editorVm = new GlyphEditorViewModel(bmp.Clone());
-      var editor = new GlyphEditorWindow();
-      var accepted = await editor.EditAsync(editorVm, this).ConfigureAwait(true);
+         var editorVm = new GlyphEditorViewModel(bmp.Clone());
 
-      if(accepted)
-      {
-         vm.EditedBitmap = editorVm.Bitmap;
-         // Optionally save immediately? Or let user click Save?
-         // The UI has a Save button, so we just update the VM state.
-         // But maybe we should save to be user friendly.
-         // For now, just update VM.
+         // Consolonia CRITICAL: Close this window BEFORE creating editor
+         var app = Application.Current;
+         if(app?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+
+         var savedVm = vm;
+         var savedWorkspace = _workspace;
+         var savedCache = _currentCache;
+
+         Close(); // Close main window FIRST!
+
+         await Dispatcher.UIThread.InvokeAsync(async () =>
+         {
+            var editor = new GlyphEditorWindow(); // Only NOW create editor!
+            desktop.MainWindow = editor;
+
+            var accepted = await editor.EditAsync(editorVm, null);
+
+            // Restore main window
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+               var newMain = new MainWindow();
+               newMain.SetWorkspace(savedWorkspace!);
+               newMain.DataContext = savedVm;
+               newMain.SetTerminalCache(savedCache!);
+
+               if(accepted)
+               {
+                  savedVm.EditedBitmap = editorVm.Bitmap;
+               }
+
+               desktop.MainWindow = newMain;
+               newMain.Show();
+            });
+         });
       }
-   }
 
    private void OnSetGlyphId(object? sender, RoutedEventArgs e)
    {
@@ -358,57 +530,30 @@ public partial class MainWindow : Window
       {
          if(DataContext is not MainViewModel vm) return;
 
-         var dialog = new Window
-         {
-            Title = "Clone Glyph",
-            Width = 40,
-            Height = 10,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-         };
+         // Use inline dialog instead of Window
+         var targetText = await InlineDialogHelper.ShowTextInputAsync(
+            this,
+            "Clone Glyph",
+            $"Clone '{vm.SelectedGlyph}' to:",
+            watermark: "U+0041 or A or internal_name");
 
-         var stack = new StackPanel { Margin = new global::Avalonia.Thickness(1) };
-         stack.Children.Add(new TextBlock { Text = $"Clone '{vm.SelectedGlyph}' to:" });
+         if(string.IsNullOrWhiteSpace(targetText)) return;
 
-         var input = new TextBox { Margin = new global::Avalonia.Thickness(0, 1, 0, 1) };
-         stack.Children.Add(input);
-
-         var buttons = new StackPanel { Orientation = global::Avalonia.Layout.Orientation.Horizontal, Spacing = 1 };
-         var okBtn = new Button { Content = "OK" };
-         var cancelBtn = new Button { Content = "Cancel" };
-         buttons.Children.Add(okBtn);
-         buttons.Children.Add(cancelBtn);
-         stack.Children.Add(buttons);
-
-         dialog.Content = stack;
-
+         // Parse target ID
          GlyphId? targetId = null;
-         okBtn.Click += (s, args) =>
-         {
-            var text = input.Text?.Trim();
-            if(string.IsNullOrEmpty(text))
-            {
-               dialog.Close();
-               return;
-            }
+         var text = targetText.Trim();
 
-            if(text.Length == 1)
-               targetId = GlyphId.FromUnicode((int)text[0]);
-            else if(text.StartsWith("U+", StringComparison.OrdinalIgnoreCase) && int.TryParse(text.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out int cp))
-               targetId = GlyphId.FromUnicode(cp);
-            else
-               targetId = GlyphId.FromInternal(text);
+         if(text.Length == 1)
+            targetId = GlyphId.FromUnicode((int)text[0]);
+         else if(text.StartsWith("U+", StringComparison.OrdinalIgnoreCase) && int.TryParse(text.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out int cp))
+            targetId = GlyphId.FromUnicode(cp);
+         else
+            targetId = GlyphId.FromInternal(text);
 
-            dialog.Close();
-         };
-
-         cancelBtn.Click += (s, args) => dialog.Close();
-
-         await dialog.ShowDialog(this);
-
-         if(targetId == null) return;
+         if(!targetId.HasValue) return;
 
          // Clone current glyph to target ID
-         if(targetId.HasValue && vm.EditedBitmap != null)
+         if(vm.EditedBitmap != null)
          {
             var glyph = new Glyph(targetId.Value, vm.GlyphSize, vm.EditedBitmap.Clone());
             await vm.Repository.SaveAsync(vm.SelectedPackId, vm.SelectedStyle, glyph, System.Threading.CancellationToken.None);
@@ -430,16 +575,39 @@ public partial class MainWindow : Window
             EndCodePoint = 126
          };
 
-         var win = new UnicodeRangeWizardWindow();
-         win.Initialize(wizVm);
+         // Consolonia CRITICAL: Close main window BEFORE creating wizard
+         var app = Application.Current;
+         if(app?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
 
-         if(_currentCache != null)
+         var savedVm = vm;
+         var savedWorkspace = _workspace;
+         var savedCache = _currentCache;
+
+         Close(); // Close FIRST!
+
+         await Dispatcher.UIThread.InvokeAsync(async () =>
          {
-            // Simplified TUI - no glyph preview control in wizard
-         }
+            var win = new UnicodeRangeWizardWindow(); // Only NOW create wizard!
+            win.Initialize(wizVm);
+            desktop.MainWindow = win;
 
-         await win.ShowDialog(this);
-         await OnGlyphSavedAsync();
+            await win.ShowDialog(null);
+
+            // Restore main window
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+               var newMain = new MainWindow();
+               newMain.SetWorkspace(savedWorkspace!);
+               newMain.DataContext = savedVm;
+               newMain.SetTerminalCache(savedCache!);
+
+               desktop.MainWindow = newMain;
+               newMain.Show();
+
+               await newMain.OnGlyphSavedAsync();
+            });
+         });
       }
 
       private async Task CloneGlyphAsync()

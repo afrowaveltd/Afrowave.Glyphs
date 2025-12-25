@@ -6,7 +6,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Core.Models;
 using Core.Text;
-using Editor.Avalonia.Services;
+using Tools.Services;
 using Storage.Abstractions.Models;
 using System;
 using System.Reactive.Linq;
