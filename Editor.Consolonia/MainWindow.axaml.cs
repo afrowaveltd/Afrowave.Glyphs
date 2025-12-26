@@ -42,7 +42,12 @@ public partial class MainWindow : Window
 
    public async Task ShowFontImportWizard(FontImportWizardViewModel wizVm)
    {
-      // Create import view inline (no new Window!)
+      // TODO: Consolonia - Font import wizard (reserved for future TUI development)
+      // For now, show placeholder message
+      System.Diagnostics.Debug.WriteLine("[Consolonia] Font import wizard not implemented in TUI version");
+      await Task.CompletedTask;
+
+      /* OLD CODE - Views removed
       var importView = new FontImportWizardView
       {
          DataContext = wizVm
@@ -53,7 +58,6 @@ public partial class MainWindow : Window
          _contentHost.Content = importView;
       }
 
-      // When wizard closes, restore main view
       wizVm.CloseHandler = async () =>
       {
          if(_contentHost != null)
@@ -61,49 +65,54 @@ public partial class MainWindow : Window
             _contentHost.Content = this.FindControl<Grid>("MainViewContent");
          }
 
-         // Reload after import
          if(DataContext is MainViewModel vm)
          {
             await vm.ReloadAsync();
          }
       };
+      */
    }
 
    public async Task ShowGlyphEditor(GlyphEditorViewModel editorVm)
    {
-      // Create editor view inline
-      var editorView = new GlyphEditorView
-      {
-         DataContext = editorVm
-      };
+      // TODO: Consolonia - Glyph editor (reserved for future TUI development)
+      System.Diagnostics.Debug.WriteLine("[Consolonia] Glyph editor not implemented in TUI version");
+         await Task.CompletedTask;
 
-      if(_contentHost != null)
-      {
-         _contentHost.Content = editorView;
+         /* OLD CODE - Views removed
+         var editorView = new GlyphEditorView
+         {
+            DataContext = editorVm
+         };
+
+         if(_contentHost != null)
+         {
+            _contentHost.Content = editorView;
+         }
+
+         var tcs = new TaskCompletionSource<bool>();
+
+         editorView.AcceptClicked += (s, e) =>
+         {
+            if(_contentHost != null)
+            {
+               _contentHost.Content = this.FindControl<Grid>("MainViewContent");
+            }
+            tcs.SetResult(true);
+         };
+
+         editorView.CancelClicked += (s, e) =>
+         {
+            if(_contentHost != null)
+            {
+               _contentHost.Content = this.FindControl<Grid>("MainViewContent");
+            }
+            tcs.SetResult(false);
+         };
+
+         await tcs.Task;
+         */
       }
-
-      var tcs = new TaskCompletionSource<bool>();
-
-      editorView.AcceptClicked += (s, e) =>
-      {
-         if(_contentHost != null)
-         {
-            _contentHost.Content = this.FindControl<Grid>("MainViewContent");
-         }
-         tcs.SetResult(true);
-      };
-
-      editorView.CancelClicked += (s, e) =>
-      {
-         if(_contentHost != null)
-         {
-            _contentHost.Content = this.FindControl<Grid>("MainViewContent");
-         }
-         tcs.SetResult(false);
-      };
-
-      await tcs.Task;
-   }
 
    public void SetTerminalCache(TerminalGlyphCache cache)
    {

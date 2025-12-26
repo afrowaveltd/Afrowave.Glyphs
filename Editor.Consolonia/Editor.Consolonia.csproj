@@ -12,6 +12,11 @@
         <AvaloniaUseCompiledBindingsByDefault>False</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
 
+    <!-- Exclude unused MainView from build -->
+    <ItemGroup>
+      <Compile Remove="Views\MainView.axaml.cs" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="Consolonia" Version="11.3.*-beta.*" />
         <PackageReference Include="System.Reactive" Version="7.0.0-preview.1" />
@@ -24,6 +29,10 @@
       <ProjectReference Include="..\Storage.Abstractions\Storage.Abstractions.csproj" />
       <ProjectReference Include="..\Storage.FileSystem\Storage.FileSystem.csproj" />
       <ProjectReference Include="..\Editor.Avalonia\Editor.Avalonia.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Folder Include="Views\" />
     </ItemGroup>
 
 </Project>
